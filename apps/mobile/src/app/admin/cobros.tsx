@@ -16,6 +16,8 @@ import {
   MESES,
   niceDate,
   planById,
+  planPrice,
+  worldOf,
   PLANS,
   STATUS_UI,
   type Billing,
@@ -54,7 +56,8 @@ export default function AdminMensualidades() {
 
   const rows = BUSINESSES.map((b) => {
     const bill = state.billing[b.slug] ?? { plan: 'estandar' as PlanId, payments: [] };
-    return { b, bill, st: billingStatus(bill) };
+    const world = worldOf(b.categorySlug);
+    return { b, bill, st: billingStatus(bill), world, price: planPrice(bill.plan, world) };
   });
   const count = (t: Tab) => rows.filter((r) => inTab(t, r.bill, r.st)).length;
   const now = new Date();
@@ -63,9 +66,9 @@ export default function AdminMensualidades() {
     .filter((p) => p.status === 'pagado' && new Date(p.createdAt).getMonth() === now.getMonth() && new Date(p.createdAt).getFullYear() === now.getFullYear())
     .reduce((a, p) => a + p.amount, 0);
   const pending = rows.flatMap((r) => r.bill.payments.filter((p) => p.status === 'pendiente'));
-  const mrr = rows.filter((r) => r.st !== 'suspendido' && r.st !== 'prueba').reduce((a, r) => a + planById(r.bill.plan).price, 0);
+  const mrr = rows.filter((r) => r.st !== 'suspendido' && r.st !== 'prueba').reduce((a, r) => a + r.price, 0);
   const overdue = rows.filter((r) => r.st === 'vencido' || r.st === 'suspendido');
-  const overdueAmount = overdue.reduce((a, r) => a + planById(r.bill.plan).price, 0);
+  const overdueAmount = overdue.reduce((a, r) => a + r.price, 0);
   const shown = rows.filter((r) => inTab(tab, r.bill, r.st)).sort((x, y) => daysLeft(x.bill.paidUntil) - daysLeft(y.bill.paidUntil));
 
   return (
@@ -96,7 +99,7 @@ export default function AdminMensualidades() {
         </AdminCard>
       ) : null}
 
-      {shown.map(({ b, bill, st }) => {
+      {shown.map(({ b, bill, st, world, price }) => {
         const plan = planById(bill.plan);
         const left = daysLeft(bill.paidUntil);
         const ui = STATUS_UI[st];
@@ -109,7 +112,7 @@ export default function AdminMensualidades() {
                 <Text style={styles.name}>{b.name}</Text>
                 <Text style={styles.sub}>
                   {plan.name}
-                  {plan.price ? ` · ${money(plan.price)}/mes` : ''}
+                  {` · ${money(price)}/mes · ${world === 'oficios' ? 'Oficio' : 'Profesionista'}`}
                   {st === 'suspendido' ? ' · oculto del directorio' : ''}
                 </Text>
                 {bill.paidUntil ? (
@@ -135,15 +138,15 @@ export default function AdminMensualidades() {
                 <Text style={styles.name}>Registrar pago recibido</Text>
                 <Text style={styles.small}>Para cuando te paga en efectivo o por depósito y no avisó en la app.</Text>
                 <View style={styles.wrap}>
-                  {PLANS.filter((x) => x.price > 0).flatMap((pl) =>
+                  {PLANS.flatMap((pl) =>
                     MESES.map((m) => (
                       <Button
                         key={`${pl.id}-${m.months}`}
-                        label={`${pl.name} · ${m.label} · ${money(pl.price * m.pay)}`}
+                        label={`${pl.name} · ${m.label} · ${money(pl.prices[world] * m.pay)}`}
                         small
                         variant="ghost"
                         onPress={() => {
-                          actions.registerSubPayment(b.slug, pl.id, m.months, pl.price * m.pay, 'efectivo');
+                          actions.registerSubPayment(b.slug, pl.id, m.months, pl.prices[world] * m.pay, 'efectivo');
                           setRegistering(null);
                         }}
                       />
@@ -162,7 +165,7 @@ export default function AdminMensualidades() {
                     onPress={() =>
                       openWhatsApp(
                         st === 'por_vencer'
-                          ? `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 vence el ${niceDate(bill.paidUntil)}. Para seguir apareciendo destacado, paga ${money(plan.price)} desde la app en Más → Mi plan. ¡Gracias!`
+                          ? `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 vence el ${niceDate(bill.paidUntil)}. Para seguir apareciendo destacado, paga ${money(price)} desde la app en Más → Mi plan. ¡Gracias!`
                           : `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 venció el ${niceDate(bill.paidUntil)}. ${st === 'suspendido' ? 'Tu perfil ya no aparece en el directorio; en cuanto pagues vuelve a aparecer.' : `Tienes hasta ${DIAS_GRACIA} días de gracia antes de que tu perfil se oculte.`} Puedes pagar desde la app en Más → Mi plan.`,
                         b.phone,
                       )
@@ -189,7 +192,8 @@ export default function AdminMensualidades() {
         {PLANS.map((p) => (
           <AdminCard key={p.id} style={{ flexGrow: 1, flexBasis: 200, gap: 4 }}>
             <Text style={styles.name}>{p.name}</Text>
-            <Text style={styles.price}>{money(p.price)}/mes</Text>
+            <Text style={styles.price}>{money(p.prices.profesionales)}/mes</Text>
+            <Text style={styles.sub}>Oficios: {money(p.prices.oficios)}/mes</Text>
             <Text style={styles.small}>{p.features.join(' · ')}</Text>
             <Chip label={`${rows.filter((r) => activePlan(r.bill) === p.id).length} negocios`} />
           </AdminCard>

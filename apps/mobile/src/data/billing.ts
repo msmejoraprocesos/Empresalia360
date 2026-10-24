@@ -1,13 +1,22 @@
+import { CATEGORIES } from './mock';
 import type { PaymentMethod } from './types';
 
 /** Planes mensuales (mismos que la tabla public.plans). */
 export type PlanId = 'estandar' | 'premium' | 'vip';
-export const PLANS: { id: PlanId; name: string; price: number; features: string[] }[] = [
-  { id: 'estandar', name: 'Estándar', price: 199, features: ['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'] },
-  { id: 'premium', name: 'Premium', price: 399, features: ['Todo lo de Estándar', 'Servicios y paquetes ilimitados', 'Sales antes en las búsquedas', 'Muro y 3 promociones al mes', 'Estadísticas de tu perfil'] },
-  { id: 'vip', name: 'VIP', price: 799, features: ['Todo lo de Premium', 'Primero en tu especialidad', 'Campañas a tus clientes', 'Varios colaboradores', '10% de descuento en espacios'] },
+/**
+ * Precio mensual según el mundo: los oficios pagan menos que los profesionistas.
+ * (Mismos valores que la tabla public.plans: monthly_price y monthly_price_oficios.)
+ */
+export type World = 'profesionales' | 'oficios';
+export const PLANS: { id: PlanId; name: string; prices: Record<World, number>; features: string[] }[] = [
+  { id: 'estandar', name: 'Estándar', prices: { profesionales: 199, oficios: 99 }, features: ['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'] },
+  { id: 'premium', name: 'Premium', prices: { profesionales: 399, oficios: 199 }, features: ['Todo lo de Estándar', 'Servicios y paquetes ilimitados', 'Sales antes en las búsquedas', 'Muro y 3 promociones al mes', 'Estadísticas de tu perfil'] },
+  { id: 'vip', name: 'VIP', prices: { profesionales: 799, oficios: 399 }, features: ['Todo lo de Premium', 'Primero en tu especialidad', 'Campañas a tus clientes', 'Varios colaboradores', '10% de descuento en espacios'] },
 ];
 export const planById = (id: PlanId) => PLANS.find((p) => p.id === id)!;
+/** Mundo de un negocio según su categoría principal */
+export const worldOf = (categorySlug: string): World => (CATEGORIES.find((c) => c.slug === categorySlug)?.group ?? 'profesionales');
+export const planPrice = (id: PlanId, world: World) => planById(id).prices[world];
 
 /** Cuántas categorías puede tener cada plan (la principal cuenta) */
 export const CATEGORY_LIMIT: Record<PlanId, number> = { estandar: 1, premium: 3, vip: 6 };
@@ -87,16 +96,16 @@ export const STATUS_UI: Record<BillingStatus, { label: string; bg: string; fg: s
  */
 const DEMO_PLAN: PlanId[] = ['vip', 'premium', 'premium', 'estandar', 'premium', 'vip', 'premium', 'estandar', 'premium', 'premium', 'estandar', 'premium', 'vip', 'premium', 'estandar', 'premium', 'premium', 'estandar'];
 const DEMO_OFFSET = [24, 3, -4, 0, 17, 9, -12, 0, 2, 28, 0, -2, 40, 12, 0, 6, 21, 0];
-export function demoBilling(slugs: string[]): Record<string, Billing> {
+export function demoBilling(list: { slug: string; categorySlug: string }[]): Record<string, Billing> {
   const out: Record<string, Billing> = {};
-  slugs.forEach((slug, i) => {
+  list.forEach(({ slug, categorySlug }, i) => {
     const plan = DEMO_PLAN[i % DEMO_PLAN.length];
     const off = DEMO_OFFSET[i % DEMO_OFFSET.length];
     // Los índices 3 y 10 están en su prueba de 30 días (aún no pagan)
     const trial = i === 3 || i === 10;
     const days = trial ? 18 + i : off || 15 + i;
     const paidUntil = isoDate(addDays(today(), days));
-    const price = planById(plan).price;
+    const price = planPrice(plan, worldOf(categorySlug));
     const payments: SubPayment[] =
       trial
         ? []

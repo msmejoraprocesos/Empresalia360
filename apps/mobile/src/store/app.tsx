@@ -199,7 +199,7 @@ const initialState: State = {
   blocked: [],
   reportedByMe: [],
   joinedCampaigns: [],
-  billing: online ? {} : demoBilling(BUSINESSES.map((b) => b.slug)),
+  billing: online ? {} : demoBilling(BUSINESSES),
   myAds: [],
   myPromotions: online ? [] : [{ id: 'mp1', title: 'Primera consulta en línea a $350', target: 'Clientes nuevos', reach: 412, redemptions: 38, active: true }],
   supplyRequests: [

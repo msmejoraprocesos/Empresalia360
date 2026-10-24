@@ -17,11 +17,13 @@ create table if not exists public.plans (
   position int not null default 0
 );
 
-insert into public.plans (id, name, monthly_price, features, position) values
-  ('estandar', 'Estándar', 199, array['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'], 1),
-  ('premium', 'Premium', 399, array['Todo lo de Estándar', 'Servicios y paquetes ilimitados', 'Sales antes en las búsquedas', 'Muro y 3 promociones al mes', 'Estadísticas de tu perfil'], 2),
-  ('vip', 'VIP', 799, array['Todo lo de Premium', 'Primero en tu especialidad', 'Campañas a tus clientes', 'Varios colaboradores', '10% de descuento en espacios'], 3)
-on conflict (id) do update set name = excluded.name, monthly_price = excluded.monthly_price, features = excluded.features, position = excluded.position;
+-- monthly_price = profesionistas; monthly_price_oficios = oficios (más económico)
+alter table public.plans add column if not exists monthly_price_oficios numeric(10, 2) not null default 0;
+insert into public.plans (id, name, monthly_price, monthly_price_oficios, features, position) values
+  ('estandar', 'Estándar', 199, 99, array['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'], 1),
+  ('premium', 'Premium', 399, 199, array['Todo lo de Estándar', 'Servicios y paquetes ilimitados', 'Sales antes en las búsquedas', 'Muro y 3 promociones al mes', 'Estadísticas de tu perfil'], 2),
+  ('vip', 'VIP', 799, 399, array['Todo lo de Premium', 'Primero en tu especialidad', 'Campañas a tus clientes', 'Varios colaboradores', '10% de descuento en espacios'], 3)
+on conflict (id) do update set name = excluded.name, monthly_price = excluded.monthly_price, monthly_price_oficios = excluded.monthly_price_oficios, features = excluded.features, position = excluded.position;
 
 alter table public.businesses
   add column if not exists paid_until date,

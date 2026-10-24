@@ -71,7 +71,7 @@ const out: string[] = [
   '',
 ];
 
-const BILLING = demoBilling(BUSINESSES.map((b) => b.slug));
+const BILLING = demoBilling(BUSINESSES);
 
 for (const b of BUSINESSES) {
   out.push(

@@ -7,7 +7,7 @@ import { SpeakButton } from '@/components/speak-button';
 import { Button, Card, Chip, Header } from '@/components/ui';
 import { COBRO_EXPERTALIA, SOPORTE_CORREO } from '@/constants/contacto';
 import { Brand, Radius, Shadow } from '@/constants/theme';
-import { newBilling, billingStatus, daysLeft, DIAS_GRACIA, MESES, niceDate, planById, PLANS, STATUS_UI, type PlanId, type SubPayment } from '@/data/billing';
+import { newBilling, planPrice, worldOf, billingStatus, daysLeft, DIAS_GRACIA, MESES, niceDate, planById, PLANS, STATUS_UI, type PlanId, type SubPayment } from '@/data/billing';
 import { money } from '@/lib/format';
 import { copyText } from '@/lib/links';
 import { myBusiness, useApp } from '@/store/app';
@@ -33,7 +33,8 @@ export default function MiPlan() {
   const [paying, setPaying] = useState(false);
   const pending = bill.payments.find((p) => p.status === 'pendiente');
   const m = MESES.find((x) => x.months === months)!;
-  const amount = planById(plan).price * m.pay;
+  const world = worldOf(myBusiness.categorySlug);
+  const amount = planPrice(plan, world) * m.pay;
   const ui = STATUS_UI[st];
 
   const statusText =
@@ -87,7 +88,7 @@ export default function MiPlan() {
               <Pressable key={p.id} accessibilityRole="radio" accessibilityState={{ checked: plan === p.id }} onPress={() => setPlan(p.id)} style={[styles.plan, Shadow, plan === p.id && styles.planOn]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={[styles.h, plan === p.id && { color: Brand.white }]}>{p.name}</Text>
-                  <Text style={[styles.price, plan === p.id && { color: '#E3B04B' }]}>{money(p.price)}/mes</Text>
+                  <Text style={[styles.price, plan === p.id && { color: '#E3B04B' }]}>{money(p.prices[world])}/mes</Text>
                 </View>
                 {p.features.map((f) => (
                   <Text key={f} style={[styles.feat, plan === p.id && { color: '#DCE3F0' }]}>
