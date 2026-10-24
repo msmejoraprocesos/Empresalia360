@@ -7,7 +7,7 @@ import { SpeakButton } from '@/components/speak-button';
 import { Button, Card, Chip, Header } from '@/components/ui';
 import { COBRO_EXPERTALIA, SOPORTE_CORREO } from '@/constants/contacto';
 import { Brand, Radius, Shadow } from '@/constants/theme';
-import { billingStatus, daysLeft, DIAS_GRACIA, MESES, niceDate, planById, PLANS, STATUS_UI, type PlanId, type SubPayment } from '@/data/billing';
+import { newBilling, billingStatus, daysLeft, DIAS_GRACIA, MESES, niceDate, planById, PLANS, STATUS_UI, type PlanId, type SubPayment } from '@/data/billing';
 import { money } from '@/lib/format';
 import { copyText } from '@/lib/links';
 import { myBusiness, useApp } from '@/store/app';
@@ -21,10 +21,10 @@ const METHODS: { id: SubPayment['method']; label: string }[] = [
 /** Mi plan: en qué plan estoy, hasta cuándo está pagado, cómo pagar y avisar que ya pagué. */
 export default function MiPlan() {
   const { state, actions } = useApp();
-  const bill = state.billing[myBusiness.slug] ?? { plan: 'estandar' as PlanId, payments: [] };
+  const bill = state.billing[myBusiness.slug] ?? newBilling();
   const st = billingStatus(bill);
   const left = daysLeft(bill.paidUntil);
-  const [plan, setPlan] = useState<PlanId>(bill.plan === 'estandar' ? 'premium' : bill.plan);
+  const [plan, setPlan] = useState<PlanId>(bill.plan);
   const [months, setMonths] = useState(1);
   const [method, setMethod] = useState<SubPayment['method']>('transferencia');
   const [reference, setReference] = useState('');
@@ -37,8 +37,8 @@ export default function MiPlan() {
   const ui = STATUS_UI[st];
 
   const statusText =
-    st === 'gratis'
-      ? 'Estás en el plan gratis. Sube de plan para salir antes en las búsquedas.'
+    st === 'prueba'
+      ? `Estás en tu prueba gratis hasta el ${niceDate(bill.paidUntil)} (quedan ${left} días). Elige tu plan y paga antes para no dejar de aparecer.`
       : st === 'al_corriente'
         ? `Pagado hasta el ${niceDate(bill.paidUntil)}. Te quedan ${left} días.`
         : st === 'por_vencer'
@@ -46,8 +46,8 @@ export default function MiPlan() {
             ? 'Tu plan vence hoy. Paga para no perder tus beneficios.'
             : `Tu plan vence en ${left} días (${niceDate(bill.paidUntil)}). Paga para no perder tus beneficios.`
           : st === 'vencido'
-            ? `Tu plan venció hace ${-left} días. Tienes ${DIAS_GRACIA + left} días de gracia antes de bajar a Estándar.`
-            : 'Tu plan se venció y bajaste a Estándar. Sigues visible, pero sin los beneficios. Paga para regresar.';
+            ? `Tu plan venció hace ${-left} días. Tienes ${DIAS_GRACIA + left} días de gracia antes de que tu perfil se oculte.`
+            : 'Tu perfil está oculto: los clientes ya no te encuentran. En cuanto confirmemos tu pago vuelves a aparecer, con tus reseñas y todo.';
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
@@ -55,7 +55,7 @@ export default function MiPlan() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         <Card style={[{ gap: 8 }, (st === 'vencido' || st === 'suspendido') && { borderWidth: 2, borderColor: '#A32020' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Emoji name={st === 'al_corriente' ? 'palomita' : st === 'gratis' ? 'regalo' : st === 'por_vencer' ? 'reloj' : 'sirena'} size={40} />
+            <Emoji name={st === 'al_corriente' ? 'palomita' : st === 'prueba' ? 'regalo' : st === 'por_vencer' ? 'reloj' : 'sirena'} size={40} />
             <View style={{ flex: 1 }}>
               <Text style={styles.big}>Plan {planById(bill.plan).name}</Text>
               <Chip label={ui.label} color={ui.bg} ink={ui.fg} />
@@ -74,7 +74,7 @@ export default function MiPlan() {
           </Card>
         ) : !paying ? (
           <Button
-            label={st === 'gratis' ? 'Subir de plan' : st === 'al_corriente' ? 'Adelantar mi pago' : 'Pagar mi mensualidad'}
+            label={st === 'prueba' ? 'Elegir mi plan y pagar' : st === 'al_corriente' ? 'Adelantar mi pago o cambiar de plan' : 'Pagar mi mensualidad'}
             icon="card-outline"
             onPress={() => setPaying(true)}
           />
@@ -83,7 +83,7 @@ export default function MiPlan() {
             <Text style={styles.step}>
               <Text style={styles.num}>1 </Text>Elige tu plan
             </Text>
-            {PLANS.filter((p) => p.price > 0).map((p) => (
+            {PLANS.map((p) => (
               <Pressable key={p.id} accessibilityRole="radio" accessibilityState={{ checked: plan === p.id }} onPress={() => setPlan(p.id)} style={[styles.plan, Shadow, plan === p.id && styles.planOn]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={[styles.h, plan === p.id && { color: Brand.white }]}>{p.name}</Text>

@@ -1,12 +1,13 @@
 -- Expertalia 360 · mensualidades de los negocios
--- Cada negocio tiene un plan (estandar = gratis, premium, vip) y una fecha "pagado hasta".
+-- Cada negocio tiene un plan de paga (estandar, premium, vip) y una fecha "pagado hasta".
+-- Al registrarse tiene 30 días de prueba.
 -- 1. El negocio avisa que pagó (transferencia, depósito o efectivo) y sube su comprobante.
 -- 2. El administrador lo confirma y la fecha se recorre solita 1, 3 o 12 meses.
 -- 3. Todos los días, a las 6:00, la base revisa a todos:
 --      faltan 5 días o menos  → por_vencer   (la app le avisa al negocio)
 --      ya venció              → vencido      (7 días de gracia; sigue con su plan)
---      venció hace más de 7   → suspendido   (baja a Estándar: sigue visible, pierde lo de paga)
---    Al volver a pagar, regresa a su plan.
+--      venció hace más de 7   → suspendido   (se oculta del directorio; sus datos y reseñas se guardan)
+--    Al volver a pagar, vuelve a aparecer.
 
 create table if not exists public.plans (
   id text primary key,
@@ -17,15 +18,17 @@ create table if not exists public.plans (
 );
 
 insert into public.plans (id, name, monthly_price, features, position) values
-  ('estandar', 'Estándar', 0, array['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'], 1),
+  ('estandar', 'Estándar', 199, array['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'], 1),
   ('premium', 'Premium', 399, array['Todo lo de Estándar', 'Servicios y paquetes ilimitados', 'Sales antes en las búsquedas', 'Muro y 3 promociones al mes', 'Estadísticas de tu perfil'], 2),
   ('vip', 'VIP', 799, array['Todo lo de Premium', 'Primero en tu especialidad', 'Campañas a tus clientes', 'Varios colaboradores', '10% de descuento en espacios'], 3)
 on conflict (id) do update set name = excluded.name, monthly_price = excluded.monthly_price, features = excluded.features, position = excluded.position;
 
 alter table public.businesses
   add column if not exists paid_until date,
-  add column if not exists plan_status text not null default 'gratis'
-    check (plan_status in ('gratis', 'al_corriente', 'por_vencer', 'vencido', 'suspendido')),
+  add column if not exists plan_status text not null default 'al_corriente'
+    check (plan_status in ('al_corriente', 'por_vencer', 'vencido', 'suspendido')),
+  -- Oculto del directorio por falta de pago (aparte de "status", que usa el administrador para moderar)
+  add column if not exists hidden_unpaid boolean not null default false,
   add column if not exists paid_plan text references public.plans (id); -- plan que pagó (para regresarlo al pagar)
 
 create table if not exists public.subscription_payments (
@@ -55,7 +58,6 @@ returns text
 language sql immutable
 as $$
   select case
-    when p_plan = 'estandar' and p_paid_until is null then 'gratis'
     when p_paid_until is null then 'vencido'
     when p_paid_until - current_date > 5 then 'al_corriente'
     when p_paid_until >= current_date then 'por_vencer'
@@ -64,7 +66,7 @@ as $$
   end;
 $$;
 
--- Revisión diaria: actualiza estados y baja a Estándar a quien lleva más de 7 días vencido
+-- Revisión diaria: actualiza estados y oculta del directorio a quien lleva más de 7 días vencido
 create or replace function public.refresh_billing()
 returns int
 language plpgsql security definer set search_path = ''
@@ -74,14 +76,13 @@ declare
 begin
   update public.businesses b
   set plan_status = public.billing_status(coalesce(b.paid_plan, b.plan), b.paid_until),
-      plan = case when public.billing_status(coalesce(b.paid_plan, b.plan), b.paid_until) = 'suspendido' then 'estandar' else b.plan end
-  where b.paid_until is not null or b.plan <> 'estandar';
+      hidden_unpaid = public.billing_status(coalesce(b.paid_plan, b.plan), b.paid_until) = 'suspendido';
   get diagnostics n = row_count;
   return n;
 end;
 $$;
 
--- Confirmar un pago (solo administrador): recorre la fecha y regresa al negocio a su plan
+-- Confirmar un pago (solo administrador): recorre la fecha y vuelve a mostrar el perfil
 create or replace function public.confirm_subscription_payment(p_payment uuid)
 returns date
 language plpgsql security definer set search_path = ''
@@ -104,7 +105,7 @@ begin
   set status = 'pagado', confirmed_by = auth.uid(), confirmed_at = now(), period_start = start_date, period_end = end_date
   where id = p_payment;
   update public.businesses
-  set paid_until = end_date, plan = pay.plan, paid_plan = pay.plan, plan_status = public.billing_status(pay.plan, end_date)
+  set paid_until = end_date, plan = pay.plan, paid_plan = pay.plan, plan_status = public.billing_status(pay.plan, end_date), hidden_unpaid = false
   where id = pay.business_id;
   return end_date;
 end;
@@ -124,9 +125,11 @@ begin
     new.plan := 'estandar';
     new.rating_avg := 0;
     new.rating_count := 0;
-    new.paid_until := null;
-    new.paid_plan := null;
-    new.plan_status := 'gratis';
+    -- 30 días de prueba con el plan Estándar
+    new.paid_until := current_date + 30;
+    new.paid_plan := 'estandar';
+    new.plan_status := 'al_corriente';
+    new.hidden_unpaid := false;
     return new;
   end if;
   new.verified := old.verified;
@@ -138,6 +141,7 @@ begin
   new.paid_until := old.paid_until;
   new.paid_plan := old.paid_plan;
   new.plan_status := old.plan_status;
+  new.hidden_unpaid := old.hidden_unpaid;
   return new;
 end;
 $$;
@@ -225,9 +229,14 @@ grant select, insert, update on public.subscription_payments to authenticated;
 grant execute on function public.confirm_subscription_payment(uuid) to authenticated;
 grant execute on function public.billing_status(text, date) to anon, authenticated;
 
--- Los negocios que ya tenían plan de paga arrancan con un mes pagado
+-- Los negocios que ya existían arrancan con 30 días
 update public.businesses set paid_until = current_date + 30, paid_plan = plan, plan_status = 'al_corriente'
-where plan <> 'estandar' and paid_until is null;
+where paid_until is null;
+
+-- El directorio público no muestra a quien está oculto por falta de pago (el dueño y el admin sí lo ven)
+drop policy if exists "negocios activos públicos" on public.businesses;
+create policy "negocios activos públicos" on public.businesses for select
+  using ((status = 'activo' and not hidden_unpaid) or owner_id = auth.uid() or public.is_admin());
 
 -- Revisión automática diaria (6:00 hora del centro de México = 12:00 UTC).
 -- Requiere la extensión pg_cron (Supabase → Database → Extensions → pg_cron). Si no está, se omite.

@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { OPENING_ADS, type OpeningAd } from '@/data/ads';
+import { HIDDEN } from '@/data';
 import { BUSINESSES, INCOMING_REQUESTS, INITIAL_ORDERS, MY_BUSINESS_SLUG, POSTS, PROMOTIONS, QUESTIONS } from '@/data/mock';
-import { addMonths, demoBilling, isoDate, parseDate, today, type Billing, type PlanId, type SubPayment } from '@/data/billing';
+import { addMonths, billingStatus, demoBilling, isoDate, parseDate, today, type Billing, type PlanId, type SubPayment } from '@/data/billing';
 import { loadAccount, loadBilling, loadCommunity, remote, saveBusiness, type AccountData } from '@/data/remote';
 import { track } from '@/lib/analytics';
 import { uploadPhoto } from '@/lib/photos';
@@ -284,11 +285,17 @@ function helpfulKeys(questions: Question[], ids: string[]): string[] {
 function useAppState() {
   const [state, setState] = useState<State>(() => {
     const world = loadWorld();
+    for (const [slug, b] of Object.entries(initialState.billing)) if (billingStatus(b) === 'suspendido') HIDDEN.add(slug);
     return { ...initialState, role: loadRole(), lookingFor: world ?? initialState.lookingFor, worldChosen: Boolean(world) };
   });
   const update = useCallback((fn: (s: State) => State) => setState(fn), []);
 
   useEffect(() => saveRole(state.role), [state.role]);
+  // Los perfiles suspendidos por falta de pago se ocultan del directorio
+  useEffect(() => {
+    HIDDEN.clear();
+    for (const [slug, b] of Object.entries(state.billing)) if (billingStatus(b) === 'suspendido') HIDDEN.add(slug);
+  }, [state.billing]);
   useEffect(() => {
     if (!state.worldChosen) return;
     try {

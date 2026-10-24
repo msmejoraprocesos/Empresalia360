@@ -89,7 +89,7 @@ export default function ElegirMundo() {
           <Emoji name="trabajador" size={30} />
           <View style={{ flex: 1 }}>
             <Text style={styles.proTitle}>¿Eres profesional u oficio?</Text>
-            <Text style={styles.proSub}>Crea tu perfil gratis y recibe clientes</Text>
+            <Text style={styles.proSub}>Crea tu perfil y prueba 30 días gratis</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={NAVY} />
         </Pressable>

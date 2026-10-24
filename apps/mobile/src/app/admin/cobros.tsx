@@ -12,6 +12,7 @@ import {
   daysLeft,
   DIAS_AVISO,
   DIAS_GRACIA,
+  DIAS_PRUEBA,
   MESES,
   niceDate,
   planById,
@@ -26,13 +27,13 @@ import { money } from '@/lib/format';
 import { openWhatsApp } from '@/lib/links';
 import { useApp } from '@/store/app';
 
-type Tab = 'confirmar' | 'vencidos' | 'por_vencer' | 'al_corriente' | 'gratis';
+type Tab = 'confirmar' | 'vencidos' | 'por_vencer' | 'al_corriente' | 'prueba';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'confirmar', label: 'Por confirmar' },
   { id: 'vencidos', label: 'Vencidos' },
   { id: 'por_vencer', label: 'Por vencer' },
   { id: 'al_corriente', label: 'Al corriente' },
-  { id: 'gratis', label: 'Plan gratis' },
+  { id: 'prueba', label: 'En prueba' },
 ];
 const METHOD: Record<string, string> = { transferencia: 'Transferencia', deposito: 'Depósito', efectivo: 'Efectivo', tarjeta: 'Tarjeta', mercadopago: 'Mercado Pago', stripe: 'Stripe', liga: 'Liga' };
 
@@ -44,7 +45,7 @@ function inTab(tab: Tab, b: Billing, st: BillingStatus) {
 
 /**
  * Mensualidades: quién pagó, quién debe y quién avisó que ya pagó.
- * Las reglas corren solas en la base todos los días (aviso, gracia y baja a Estándar).
+ * Las reglas corren solas en la base todos los días (aviso, gracia y ocultar a quien no paga).
  */
 export default function AdminMensualidades() {
   const { state, actions } = useApp();
@@ -62,7 +63,7 @@ export default function AdminMensualidades() {
     .filter((p) => p.status === 'pagado' && new Date(p.createdAt).getMonth() === now.getMonth() && new Date(p.createdAt).getFullYear() === now.getFullYear())
     .reduce((a, p) => a + p.amount, 0);
   const pending = rows.flatMap((r) => r.bill.payments.filter((p) => p.status === 'pendiente'));
-  const mrr = rows.filter((r) => r.st !== 'suspendido' && r.st !== 'gratis').reduce((a, r) => a + planById(r.bill.plan).price, 0);
+  const mrr = rows.filter((r) => r.st !== 'suspendido' && r.st !== 'prueba').reduce((a, r) => a + planById(r.bill.plan).price, 0);
   const overdue = rows.filter((r) => r.st === 'vencido' || r.st === 'suspendido');
   const overdueAmount = overdue.reduce((a, r) => a + planById(r.bill.plan).price, 0);
   const shown = rows.filter((r) => inTab(tab, r.bill, r.st)).sort((x, y) => daysLeft(x.bill.paidUntil) - daysLeft(y.bill.paidUntil));
@@ -109,7 +110,7 @@ export default function AdminMensualidades() {
                 <Text style={styles.sub}>
                   {plan.name}
                   {plan.price ? ` · ${money(plan.price)}/mes` : ''}
-                  {activePlan(bill) !== bill.plan ? ' · hoy se muestra como Estándar' : ''}
+                  {st === 'suspendido' ? ' · oculto del directorio' : ''}
                 </Text>
                 {bill.paidUntil ? (
                   <Text style={styles.sub}>
@@ -162,7 +163,7 @@ export default function AdminMensualidades() {
                       openWhatsApp(
                         st === 'por_vencer'
                           ? `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 vence el ${niceDate(bill.paidUntil)}. Para seguir apareciendo destacado, paga ${money(plan.price)} desde la app en Más → Mi plan. ¡Gracias!`
-                          : `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 venció el ${niceDate(bill.paidUntil)}. ${st === 'suspendido' ? 'Tu perfil sigue visible, pero ya está como Estándar.' : `Tienes hasta ${DIAS_GRACIA} días de gracia antes de bajar a Estándar.`} Puedes pagar desde la app en Más → Mi plan.`,
+                          : `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 venció el ${niceDate(bill.paidUntil)}. ${st === 'suspendido' ? 'Tu perfil ya no aparece en el directorio; en cuanto pagues vuelve a aparecer.' : `Tienes hasta ${DIAS_GRACIA} días de gracia antes de que tu perfil se oculte.`} Puedes pagar desde la app en Más → Mi plan.`,
                         b.phone,
                       )
                     }
@@ -179,15 +180,16 @@ export default function AdminMensualidades() {
         <Text style={[styles.name, { color: '#E3B04B' }]}>Lo que pasa solo, todos los días a las 6:00</Text>
         <Text style={styles.rule}>• Faltan {DIAS_AVISO} días o menos: queda “Por vencer” y al negocio le sale un aviso en su panel para pagar.</Text>
         <Text style={styles.rule}>• Se le pasó la fecha: queda “Vencido” con {DIAS_GRACIA} días de gracia; sigue con su plan y el aviso se vuelve rojo.</Text>
-        <Text style={styles.rule}>• Pasan los {DIAS_GRACIA} días: baja a Estándar (gratis). Sigue visible en el directorio, pero pierde lo de su plan.</Text>
-        <Text style={styles.rule}>• Avisa que pagó: te aparece en “Por confirmar” con su comprobante. Al confirmar, la fecha se recorre sola y regresa a su plan.</Text>
+        <Text style={styles.rule}>• Pasan los {DIAS_GRACIA} días: su perfil se oculta del directorio (búsquedas, categorías y mapa). Sus datos y reseñas se guardan.</Text>
+        <Text style={styles.rule}>• Quien se registra tiene {DIAS_PRUEBA} días de prueba; al terminar, si no paga, sigue las mismas reglas.</Text>
+        <Text style={styles.rule}>• Avisa que pagó: te aparece en “Por confirmar” con su comprobante. Al confirmar, la fecha se recorre sola y vuelve a aparecer.</Text>
       </AdminCard>
 
       <View style={styles.kpis}>
         {PLANS.map((p) => (
           <AdminCard key={p.id} style={{ flexGrow: 1, flexBasis: 200, gap: 4 }}>
             <Text style={styles.name}>{p.name}</Text>
-            <Text style={styles.price}>{p.price ? `${money(p.price)}/mes` : 'Gratis'}</Text>
+            <Text style={styles.price}>{money(p.price)}/mes</Text>
             <Text style={styles.small}>{p.features.join(' · ')}</Text>
             <Chip label={`${rows.filter((r) => activePlan(r.bill) === p.id).length} negocios`} />
           </AdminCard>

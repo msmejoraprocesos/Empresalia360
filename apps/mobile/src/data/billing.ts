@@ -3,7 +3,7 @@ import type { PaymentMethod } from './types';
 /** Planes mensuales (mismos que la tabla public.plans). */
 export type PlanId = 'estandar' | 'premium' | 'vip';
 export const PLANS: { id: PlanId; name: string; price: number; features: string[] }[] = [
-  { id: 'estandar', name: 'Estándar', price: 0, features: ['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'] },
+  { id: 'estandar', name: 'Estándar', price: 199, features: ['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'] },
   { id: 'premium', name: 'Premium', price: 399, features: ['Todo lo de Estándar', 'Servicios y paquetes ilimitados', 'Sales antes en las búsquedas', 'Muro y 3 promociones al mes', 'Estadísticas de tu perfil'] },
   { id: 'vip', name: 'VIP', price: 799, features: ['Todo lo de Premium', 'Primero en tu especialidad', 'Campañas a tus clientes', 'Varios colaboradores', '10% de descuento en espacios'] },
 ];
@@ -12,7 +12,8 @@ export const planById = (id: PlanId) => PLANS.find((p) => p.id === id)!;
 /** Cuántas categorías puede tener cada plan (la principal cuenta) */
 export const CATEGORY_LIMIT: Record<PlanId, number> = { estandar: 1, premium: 3, vip: 6 };
 
-/** Reglas automáticas: aviso antes de vencer y días de gracia antes de bajar a Estándar. */
+/** Reglas automáticas: prueba al registrarse, aviso antes de vencer y días de gracia antes de ocultar el perfil. */
+export const DIAS_PRUEBA = 30;
 export const DIAS_AVISO = 5;
 export const DIAS_GRACIA = 7;
 /** Pagar 12 meses: se cobran 10 */
@@ -22,7 +23,7 @@ export const MESES: { months: number; label: string; pay: number }[] = [
   { months: 12, label: '12 meses (2 gratis)', pay: 10 },
 ];
 
-export type BillingStatus = 'gratis' | 'al_corriente' | 'por_vencer' | 'vencido' | 'suspendido';
+export type BillingStatus = 'prueba' | 'al_corriente' | 'por_vencer' | 'vencido' | 'suspendido';
 export type SubPayment = {
   id: string;
   plan: PlanId;
@@ -36,9 +37,8 @@ export type SubPayment = {
   periodEnd?: string;
 };
 export type Billing = {
-  /** Plan que pagó (si está suspendido, se usa Estándar mientras tanto) */
   plan: PlanId;
-  /** AAAA-MM-DD; sin fecha = Estándar gratis */
+  /** AAAA-MM-DD hasta donde está pagado (o hasta donde dura su prueba) */
   paidUntil?: string;
   payments: SubPayment[];
 };
@@ -56,26 +56,29 @@ export function addMonths(d: Date, n: number) {
 export const daysLeft = (paidUntil?: string) => (paidUntil ? Math.round((parseDate(paidUntil).getTime() - today().getTime()) / DAY) : 0);
 export const niceDate = (s?: string) => (s ? parseDate(s).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
-/** Igual que public.billing_status en la base de datos */
-export function billingStatus(b: Pick<Billing, 'plan' | 'paidUntil'>): BillingStatus {
-  if (b.plan === 'estandar' && !b.paidUntil) return 'gratis';
-  if (!b.paidUntil) return 'vencido';
+/** Igual que public.billing_status en la base de datos. "prueba" = aún no hace su primer pago. */
+export function billingStatus(b: Pick<Billing, 'plan' | 'paidUntil'> & { payments?: SubPayment[] }): BillingStatus {
+  if (!b.paidUntil) return 'suspendido';
   const left = daysLeft(b.paidUntil);
-  if (left > DIAS_AVISO) return 'al_corriente';
+  const trial = b.payments ? !b.payments.some((p) => p.status === 'pagado') : false;
+  if (left > DIAS_AVISO) return trial ? 'prueba' : 'al_corriente';
   if (left >= 0) return 'por_vencer';
   if (-left <= DIAS_GRACIA) return 'vencido';
   return 'suspendido';
 }
 
-/** Plan con el que se muestra hoy (suspendido = Estándar) */
-export const activePlan = (b: Billing): PlanId => (billingStatus(b) === 'suspendido' ? 'estandar' : b.plan);
+/** Plan con sus beneficios (si está suspendido, igual no aparece en el directorio) */
+export const activePlan = (b: Billing): PlanId => b.plan;
+
+/** Registro de un perfil nuevo: Estándar con 30 días de prueba */
+export const newBilling = (): Billing => ({ plan: 'estandar', paidUntil: isoDate(addDays(today(), DIAS_PRUEBA)), payments: [] });
 
 export const STATUS_UI: Record<BillingStatus, { label: string; bg: string; fg: string }> = {
-  gratis: { label: 'Plan gratis', bg: '#E8ECF3', fg: '#3D4760' },
+  prueba: { label: 'En prueba', bg: '#E3ECFB', fg: '#1B3F7A' },
   al_corriente: { label: 'Al corriente', bg: '#DDF3E8', fg: '#0C6B47' },
   por_vencer: { label: 'Por vencer', bg: '#FFF1CC', fg: '#7A5600' },
   vencido: { label: 'Vencido · en gracia', bg: '#FDE2E2', fg: '#A32020' },
-  suspendido: { label: 'Suspendido · bajó a Estándar', bg: '#2B2B2B', fg: '#FFFFFF' },
+  suspendido: { label: 'Suspendido · oculto', bg: '#2B2B2B', fg: '#FFFFFF' },
 };
 
 /**
@@ -89,12 +92,15 @@ export function demoBilling(slugs: string[]): Record<string, Billing> {
   slugs.forEach((slug, i) => {
     const plan = DEMO_PLAN[i % DEMO_PLAN.length];
     const off = DEMO_OFFSET[i % DEMO_OFFSET.length];
-    const paidUntil = plan === 'estandar' ? undefined : isoDate(addDays(today(), off));
+    // Los índices 3 y 10 están en su prueba de 30 días (aún no pagan)
+    const trial = i === 3 || i === 10;
+    const days = trial ? 18 + i : off || 15 + i;
+    const paidUntil = isoDate(addDays(today(), days));
     const price = planById(plan).price;
     const payments: SubPayment[] =
-      plan === 'estandar'
+      trial
         ? []
-        : [{ id: `sp-${i}-1`, plan, months: 1, amount: price, method: i % 2 ? 'transferencia' : 'deposito', reference: `SPEI ${7300 + i * 37}`, status: 'pagado', createdAt: addDays(today(), off - 31).getTime(), periodEnd: paidUntil }];
+        : [{ id: `sp-${i}-1`, plan, months: 1, amount: price, method: i % 2 ? 'transferencia' : 'deposito', reference: `SPEI ${7300 + i * 37}`, status: 'pagado', createdAt: addDays(today(), days - 31).getTime(), periodEnd: paidUntil }];
     // Dos negocios ya avisaron que pagaron y esperan tu confirmación
     if (i === 2 || i === 11) payments.unshift({ id: `sp-${i}-2`, plan, months: i === 2 ? 3 : 1, amount: price * (i === 2 ? 3 : 1), method: 'transferencia', reference: `SPEI ${9100 + i}`, status: 'pendiente', createdAt: Date.now() - (i + 2) * 3600000 });
     out[slug] = { plan, paidUntil, payments };

@@ -4,6 +4,13 @@ import { metersBetween } from '@/lib/format';
 
 export * from './mock';
 
+/**
+ * Perfiles ocultos por falta de pago (suspendidos). No salen en búsquedas, categorías ni mapa,
+ * pero su página directa y su panel siguen funcionando. Con Supabase, la base ya no los manda.
+ */
+export const HIDDEN = new Set<string>();
+export const isListed = (b: Business) => !HIDDEN.has(b.slug);
+
 export function getBusiness(slug: string | undefined): Business | undefined {
   return BUSINESSES.find((b) => b.slug === slug);
 }
@@ -41,7 +48,7 @@ export function specialtiesIn(b: Business, world?: 'profesionales' | 'oficios'):
 }
 
 export function businessesInCategory(slug: string): Business[] {
-  return BUSINESSES.filter((b) => inCategory(b, slug));
+  return BUSINESSES.filter((b) => isListed(b) && inCategory(b, slug));
 }
 
 export const ATTEND_LABEL: Record<Attend, string> = {
@@ -90,6 +97,7 @@ export function searchProfessionals(q: string, f: SearchFilters = {}): Business[
   const t = norm(q);
   const matchedSpecialties = new Set(specialtiesFor(q).map((m) => m.specialty));
   let list = BUSINESSES.filter((b) => {
+    if (!isListed(b)) return false;
     if (f.category && !inCategory(b, f.category)) return false;
     if (f.specialty && !b.specialties.includes(f.specialty)) return false;
     if (f.attend && !b.attends.includes(f.attend)) return false;
@@ -128,7 +136,7 @@ export function distanceTo(b: Business): number {
 }
 
 export function countInCategory(slug: string): number {
-  return BUSINESSES.filter((b) => inCategory(b, slug)).length;
+  return BUSINESSES.filter((b) => isListed(b) && inCategory(b, slug)).length;
 }
 
 /** Acción principal del perfil según lo que ofrece el profesional. */

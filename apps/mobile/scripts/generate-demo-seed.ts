@@ -125,8 +125,8 @@ for (const b of BUSINESSES) {
   const off = bill.paidUntil ? Math.round((new Date(`${bill.paidUntil}T00:00:00`).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000) : null;
   out.push(
     off === null
-      ? `update public.businesses set plan = 'estandar', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = ${q(b.slug)};`
-      : `update public.businesses set plan = ${q(bill.plan)}, paid_plan = ${q(bill.plan)}, paid_until = current_date + ${off}, plan_status = public.billing_status(${q(bill.plan)}, current_date + ${off}) where slug = ${q(b.slug)};`,
+      ? `update public.businesses set plan = 'estandar', paid_plan = 'estandar', paid_until = current_date + 30, plan_status = 'al_corriente' where slug = ${q(b.slug)};`
+      : `update public.businesses set plan = ${q(bill.plan)}, paid_plan = ${q(bill.plan)}, paid_until = current_date + ${off}, plan_status = public.billing_status(${q(bill.plan)}, current_date + ${off}), hidden_unpaid = public.billing_status(${q(bill.plan)}, current_date + ${off}) = 'suspendido' where slug = ${q(b.slug)};`,
   );
   for (const p of bill.payments) {
     out.push(
