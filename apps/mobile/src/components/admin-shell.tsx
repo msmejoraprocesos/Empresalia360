@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BrandLogo } from '@/components/brand-logo';
 import { Brand, Radius } from '@/constants/theme';
 import { useApp } from '@/store/app';
 
@@ -55,9 +56,7 @@ export function AdminShell({ title, subtitle, children, action }: { title: strin
     <View style={{ flex: 1, flexDirection: wide ? 'row' : 'column', backgroundColor: Brand.tortilla }}>
       {wide ? (
         <View style={[styles.side, { paddingTop: insets.top + 22 }]}>
-          <Text style={styles.logo}>
-            expertalia<Text style={{ color: Brand.mango }}> 360</Text>
-          </Text>
+          <BrandLogo variant="claro" width={180} />
           <Text style={styles.sideSub}>Administración</Text>
           <View style={{ gap: 2, marginTop: 18 }}>{nav}</View>
           <Pressable onPress={() => router.replace('/')} style={[styles.navItem, { marginTop: 20 }]} accessibilityRole="link">
@@ -67,9 +66,10 @@ export function AdminShell({ title, subtitle, children, action }: { title: strin
       ) : (
         <View style={{ backgroundColor: Brand.ink, paddingTop: insets.top + 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 }}>
-            <Text style={styles.logo}>
-              expertalia<Text style={{ color: Brand.mango }}> 360</Text> <Text style={styles.sideSub}>admin</Text>
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <BrandLogo variant="claro" width={150} />
+              <Text style={styles.sideSub}>admin</Text>
+            </View>
             <Pressable onPress={() => router.replace('/')} accessibilityRole="link" hitSlop={8}>
               <Text style={{ color: '#E3E8EF', fontSize: 13 }}>Salir</Text>
             </Pressable>

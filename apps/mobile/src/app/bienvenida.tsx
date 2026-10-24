@@ -7,6 +7,7 @@ import { Emoji } from '@/components/emoji';
 import { SpeakButton } from '@/components/speak-button';
 import { Button } from '@/components/ui';
 import type { EmojiName } from '@/constants/emoji';
+import { BrandLogo } from '@/components/brand-logo';
 import { Brand } from '@/constants/theme';
 import type { IconName } from '@/data/types';
 
@@ -25,9 +26,7 @@ export default function Bienvenida() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 28 }]}>
-      <Text style={styles.logo}>
-        expertalia<Text style={{ color: Brand.mango }}> 360</Text>
-      </Text>
+      <BrandLogo variant="claro" width={260} />
 
       <View style={styles.hero}>
         <View style={styles.circle}>

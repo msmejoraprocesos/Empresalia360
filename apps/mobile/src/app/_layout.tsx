@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { BrandLogo } from '@/components/brand-logo';
 import { Brand } from '@/constants/theme';
 import { loadCatalog } from '@/data/remote';
 import '@/lib/supabase';
@@ -25,9 +26,7 @@ export default function RootLayout() {
   if (!ready) {
     return (
       <View style={{ flex: 1, backgroundColor: Brand.chile, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <Text style={{ color: Brand.white, fontSize: 34, fontWeight: '800' }}>
-          expertalia<Text style={{ color: Brand.mango }}> 360</Text>
-        </Text>
+        <BrandLogo variant="claro" width={260} />
         <ActivityIndicator color={Brand.white} />
       </View>
     );

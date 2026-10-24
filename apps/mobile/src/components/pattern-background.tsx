@@ -9,9 +9,24 @@ import type { IconName } from '@/data/types';
  * Cada sección tiene el suyo: profesionales (documentos, balanza, calculadora…),
  * oficios (herramientas, agua, luz…) y comunidad (mezcla de ambos).
  */
-export type PatternKind = 'profesionales' | 'oficios' | 'comunidad';
+export type PatternKind = 'profesionales' | 'oficios' | 'comunidad' | 'marca' | 'sobreColor';
 
-const THEMES: Record<PatternKind, { bg: string; ink: string; icons: IconName[] }> = {
+const THEMES: Record<PatternKind, { bg: string; ink: string; inks?: string[]; icons: IconName[]; step?: number }> = {
+  // Fondo de la marca, como el papel tapiz de WhatsApp: crema con dibujos azul marino y dorados
+  marca: {
+    bg: '#F2ECE2',
+    ink: 'rgba(19,32,63,0.13)',
+    inks: ['rgba(19,32,63,0.13)', 'rgba(176,132,32,0.22)', 'rgba(19,32,63,0.10)'],
+    icons: ['briefcase-outline', 'hammer-outline', 'chatbubble-ellipses-outline', 'document-text-outline', 'water-outline', 'star-outline', 'calculator-outline', 'flash-outline', 'calendar-outline', 'key-outline', 'heart-outline', 'school-outline', 'construct-outline', 'thumbs-up-outline', 'home-outline', 'call-outline', 'bulb-outline', 'location-outline'],
+    step: 42,
+  },
+  // Dibujos blancos muy suaves para poner sobre tarjetas de color
+  sobreColor: {
+    bg: 'transparent',
+    ink: 'rgba(255,255,255,0.10)',
+    icons: ['briefcase-outline', 'hammer-outline', 'star-outline', 'document-text-outline', 'construct-outline', 'chatbubble-outline', 'key-outline', 'school-outline'],
+    step: 38,
+  },
   profesionales: {
     bg: '#EEF2F9',
     ink: 'rgba(31,58,104,0.09)',
@@ -29,13 +44,14 @@ const THEMES: Record<PatternKind, { bg: string; ink: string; icons: IconName[] }
   },
 };
 
-const STEP = 46;
+const STEP_DEFAULT = 46;
 const COLS = 12;
 const ROWS = 40;
 
 /** Capa de dibujos; va detrás del contenido (posición absoluta). */
 export const Pattern = memo(function Pattern({ kind }: { kind: PatternKind }) {
   const t = THEMES[kind];
+  const STEP = t.step ?? STEP_DEFAULT;
   const cells = [];
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -43,7 +59,7 @@ export const Pattern = memo(function Pattern({ kind }: { kind: PatternKind }) {
       const rot = ((r * 37 + c * 53) % 50) - 25;
       cells.push(
         <View key={`${r}-${c}`} style={{ pointerEvents: 'none', position: 'absolute', left: c * STEP + (r % 2 ? STEP / 2 : 0) - 10, top: r * STEP - 10, transform: [{ rotate: `${rot}deg` }] }}>
-          <Ionicons name={t.icons[i]} size={r % 3 === 0 ? 22 : 18} color={t.ink} />
+          <Ionicons name={t.icons[i]} size={r % 3 === 0 ? 22 : (r + c) % 4 === 0 ? 15 : 18} color={t.inks ? t.inks[(r * 3 + c) % t.inks.length] : t.ink} />
         </View>,
       );
     }
@@ -65,4 +81,4 @@ export function PatternView({ kind, style, children }: { kind: PatternKind; styl
   );
 }
 
-export const PATTERN_BG = { profesionales: THEMES.profesionales.bg, oficios: THEMES.oficios.bg, comunidad: THEMES.comunidad.bg };
+export const PATTERN_BG = { profesionales: THEMES.profesionales.bg, oficios: THEMES.oficios.bg, comunidad: THEMES.comunidad.bg, marca: THEMES.marca.bg };
