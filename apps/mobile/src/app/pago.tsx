@@ -9,6 +9,7 @@ import { Brand, Radius } from '@/constants/theme';
 import { getBusiness } from '@/data';
 import type { PaymentMethod } from '@/data/types';
 import { money } from '@/lib/format';
+import { useLoginGate } from '@/lib/auth';
 import { useApp } from '@/store/app';
 
 const METHODS: { value: PaymentMethod; label: string; sub: string }[] = [
@@ -21,6 +22,7 @@ export default function Pago() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
   const { state, actions } = useApp();
+  const gate = useLoginGate();
   const b = getBusiness(slug ?? state.cart.businessSlug ?? undefined);
   const [method, setMethod] = useState<PaymentMethod>('tarjeta');
   const [note, setNote] = useState('');
@@ -113,10 +115,10 @@ export default function Pago() {
         </View>
         <Button
           label={method === 'efectivo' ? `Contratar y pagar al atenderte · ${money(total)}` : `Pagar ${money(total)}`}
-          onPress={() => {
+          onPress={() => gate(() => {
             actions.placeOrder({ business: b, mode: state.cart.mode, method, total, note: delivery ? `${address}. ${note}` : undefined });
             router.replace('/pedido-confirmado');
-          }}
+          })}
         />
       </BottomBar>
     </View>

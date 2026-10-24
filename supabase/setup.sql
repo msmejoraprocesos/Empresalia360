@@ -1,6 +1,6 @@
 -- Expertalia 360 · instalación completa en un proyecto nuevo de Supabase
--- Pega este archivo completo en Supabase → SQL Editor → New query → Run.
--- Generado a partir de supabase/migrations, seed.sql y seed_demo.sql.
+-- Pega este archivo completo en Supabase → SQL Editor → New query → Run (una sola vez).
+-- Generado por supabase/build-setup.sh a partir de supabase/migrations, seed.sql y seed_demo.sql.
 
 -- ════════ supabase/migrations/20261023000000_esquema_inicial.sql ════════
 -- Expertalia 360 · esquema inicial
@@ -821,191 +821,567 @@ create policy "fotos: el dueño borra" on storage.objects
   for delete to authenticated
   using (bucket_id = 'fotos' and public.owns_photo_folder(name));
 
+-- ════════ supabase/migrations/20261024000000_expertalia.sql ════════
+-- Expertalia 360 · directorio de profesionistas y oficios
+-- 1. Dos mundos que no se mezclan: categorías de "profesionales" (con carrera y cédula) y "oficios".
+-- 2. Perfil profesional: especialidades, cédula, experiencia, cómo atiende, galería y referencias.
+-- 3. Comunidad: muro de servicios/consejos/eventos, preguntas a expertos y respuestas útiles.
+-- 4. Solicitudes de cita, cotización y contratación que le llegan al profesional.
+-- 5. El dueño no puede marcarse como verificado ni activarse solo: eso lo hace el administrador.
+
+-- ─────────────────────────────────────────────────────────────
+-- Categorías y especialidades
+-- ─────────────────────────────────────────────────────────────
+alter table public.categories
+  add column if not exists world text not null default 'profesionales' check (world in ('profesionales', 'oficios')),
+  add column if not exists professional text,
+  add column if not exists emoji text,
+  add column if not exists ink text;
+
+create table if not exists public.specialties (
+  id uuid primary key default gen_random_uuid(),
+  category_id uuid not null references public.categories (id) on delete cascade,
+  name text not null,
+  emoji text,
+  keywords text[] not null default '{}',
+  position int not null default 0,
+  unique (category_id, name)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- Perfil profesional
+-- ─────────────────────────────────────────────────────────────
+alter table public.businesses
+  add column if not exists profession text,
+  add column if not exists specialties text[] not null default '{}',
+  add column if not exists years_exp int not null default 0 check (years_exp >= 0),
+  add column if not exists license text,              -- cédula profesional o certificación
+  add column if not exists education text,
+  add column if not exists languages text[] not null default '{Español}',
+  add column if not exists attends text[] not null default '{despacho}', -- despacho | en_linea | domicilio
+  add column if not exists consult_price numeric(10, 2),                -- 0 = primera consulta sin costo
+  add column if not exists response_time text,
+  add column if not exists directions text,           -- referencias para llegar
+  add column if not exists urgent24 boolean not null default false,
+  add column if not exists warranty text,
+  add column if not exists available boolean not null default true,
+  add column if not exists accepts_new boolean not null default true;
+
+create index if not exists businesses_specialties_idx on public.businesses using gin (specialties);
+
+-- Galería de trabajos o del despacho
+create table if not exists public.business_photos (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  url text,
+  caption text not null default '',
+  color text,
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists business_photos_business_idx on public.business_photos (business_id, position);
+
+-- La calificación promedio la recalcula el sistema al llegar una reseña; marca la operación
+-- para que la protección de campos (abajo) la deje pasar.
+create or replace function public.refresh_business_rating()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  bid uuid := coalesce(new.business_id, old.business_id);
+begin
+  perform set_config('expertalia.rating', 'on', true);
+  update public.businesses b
+  set rating_avg = coalesce((select round(avg(rating)::numeric, 1) from public.reviews r where r.business_id = bid and not r.hidden), 0),
+      rating_count = (select count(*) from public.reviews r where r.business_id = bid and not r.hidden)
+  where b.id = bid;
+  perform set_config('expertalia.rating', 'off', true);
+  return null;
+end;
+$$;
+
+-- El dueño no cambia verificado, estado, plan, calificación ni dueño: solo el administrador.
+-- Las instrucciones corridas desde el SQL Editor de Supabase (sin pasar por la app) no se limitan.
+create or replace function public.businesses_protect_fields()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if session_user <> 'authenticator' or public.is_admin() or coalesce(current_setting('expertalia.rating', true), 'off') = 'on' then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    new.verified := false;
+    new.plan := 'basico';
+    new.rating_avg := 0;
+    new.rating_count := 0;
+    return new;
+  end if;
+  new.verified := old.verified;
+  new.status := old.status;
+  new.plan := old.plan;
+  new.rating_avg := old.rating_avg;
+  new.rating_count := old.rating_count;
+  new.owner_id := old.owner_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists businesses_protect on public.businesses;
+create trigger businesses_protect
+  before insert or update on public.businesses
+  for each row execute function public.businesses_protect_fields();
+
+-- Alta de perfil: el profesional aparece de inmediato (sin palomita de verificado hasta que se revise su cédula)
+drop policy if exists "dar de alta mi negocio" on public.businesses;
+create policy "dar de alta mi negocio" on public.businesses for insert
+  with check ((owner_id = auth.uid() and status in ('pendiente', 'activo')) or public.is_admin());
+
+-- Reclamar un perfil dado de alta por el operador (sin dueño todavía) queda pendiente de aprobación
+create table if not exists public.business_claims (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  license text,
+  note text,
+  status text not null default 'pendiente' check (status in ('pendiente', 'aprobada', 'rechazada')),
+  created_at timestamptz not null default now(),
+  unique (business_id, user_id)
+);
+
+-- Al aprobar el reclamo, el negocio pasa a ser del usuario
+create or replace function public.business_claims_apply()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if new.status = 'aprobada' and old.status <> 'aprobada' then
+    update public.businesses set owner_id = new.user_id where id = new.business_id;
+    update public.profiles set role = 'negocio' where id = new.user_id and role = 'vecino';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists business_claims_after on public.business_claims;
+create trigger business_claims_after
+  after update of status on public.business_claims
+  for each row execute function public.business_claims_apply();
+
+-- ¿Cuál es mi perfil profesional? (el primero que tenga)
+create or replace function public.my_business_slug()
+returns text
+language sql stable security definer set search_path = ''
+as $$
+  select slug from public.businesses where owner_id = auth.uid() order by created_at limit 1;
+$$;
+
+-- ─────────────────────────────────────────────────────────────
+-- Comunidad: muro
+-- ─────────────────────────────────────────────────────────────
+create table if not exists public.posts (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  kind text not null default 'consejo' check (kind in ('servicio', 'consejo', 'evento')),
+  title text not null,
+  body text not null default '',
+  specialty text,
+  price numeric(10, 2),
+  price_note text,
+  image_url text,
+  likes_count int not null default 0,
+  hidden boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists posts_created_idx on public.posts (created_at desc);
+
+create table if not exists public.post_likes (
+  post_id uuid not null references public.posts (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+
+create table if not exists public.post_comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.posts (id) on delete cascade,
+  author_id uuid references public.profiles (id) on delete set null,
+  author_name text,
+  body text not null check (length(body) between 1 and 1000),
+  created_at timestamptz not null default now()
+);
+create index if not exists post_comments_post_idx on public.post_comments (post_id, created_at);
+
+create or replace function public.post_likes_count()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  pid uuid := coalesce(new.post_id, old.post_id);
+begin
+  update public.posts set likes_count = (select count(*) from public.post_likes where post_id = pid) where id = pid;
+  return null;
+end;
+$$;
+
+drop trigger if exists post_likes_after on public.post_likes;
+create trigger post_likes_after
+  after insert or delete on public.post_likes
+  for each row execute function public.post_likes_count();
+
+-- Nombre visible ("Ana G.") a partir del perfil, para comentarios, preguntas y solicitudes
+create or replace function public.short_name(uid uuid)
+returns text
+language sql stable security definer set search_path = ''
+as $$
+  select coalesce(
+    nullif(trim(split_part(p.full_name, ' ', 1) || ' ' || left(split_part(p.full_name, ' ', 2), 1) || '.'), '.'),
+    'Vecino'
+  ) from public.profiles p where p.id = uid;
+$$;
+
+create or replace function public.set_author_name()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if new.author_id is not null and new.author_name is null then
+    new.author_name := coalesce(public.short_name(new.author_id), 'Vecino');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists post_comments_author on public.post_comments;
+create trigger post_comments_author
+  before insert on public.post_comments
+  for each row execute function public.set_author_name();
+
+-- ─────────────────────────────────────────────────────────────
+-- Comunidad: preguntas a expertos
+-- ─────────────────────────────────────────────────────────────
+create table if not exists public.questions (
+  id uuid primary key default gen_random_uuid(),
+  category_id uuid not null references public.categories (id) on delete cascade,
+  author_id uuid references public.profiles (id) on delete set null,
+  author_name text,
+  specialty text,
+  body text not null check (length(body) between 10 and 1000),
+  hidden boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists questions_created_idx on public.questions (created_at desc);
+
+drop trigger if exists questions_author on public.questions;
+create trigger questions_author
+  before insert on public.questions
+  for each row execute function public.set_author_name();
+
+create table if not exists public.answers (
+  id uuid primary key default gen_random_uuid(),
+  question_id uuid not null references public.questions (id) on delete cascade,
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  body text not null check (length(body) between 10 and 2000),
+  helpful_count int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists answers_question_idx on public.answers (question_id, created_at);
+
+create table if not exists public.answer_helpful (
+  answer_id uuid not null references public.answers (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  primary key (answer_id, user_id)
+);
+
+create or replace function public.answer_helpful_count()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  aid uuid := coalesce(new.answer_id, old.answer_id);
+begin
+  update public.answers set helpful_count = (select count(*) from public.answer_helpful where answer_id = aid) where id = aid;
+  return null;
+end;
+$$;
+
+drop trigger if exists answer_helpful_after on public.answer_helpful;
+create trigger answer_helpful_after
+  after insert or delete on public.answer_helpful
+  for each row execute function public.answer_helpful_count();
+
+-- ─────────────────────────────────────────────────────────────
+-- Solicitudes al profesional: cita, cotización, contratación de paquete
+-- ─────────────────────────────────────────────────────────────
+create table if not exists public.requests (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  customer_id uuid references public.profiles (id) on delete set null,
+  customer_name text,
+  customer_phone text,
+  type text not null check (type in ('cita', 'cotizacion', 'contratacion')),
+  item_id uuid references public.catalog_items (id) on delete set null,
+  specialty text,
+  detail text not null default '',
+  when_text text,                      -- "Mañana 10:00", "Recibida ahora"
+  starts_at timestamptz,
+  attend text not null default 'despacho' check (attend in ('despacho', 'en_linea', 'domicilio')),
+  status text not null default 'nueva' check (status in ('nueva', 'aceptada', 'cotizada', 'rechazada', 'atendida', 'cancelada')),
+  quoted_price numeric(10, 2),
+  amount numeric(10, 2),
+  payment_method public.payment_method,
+  created_at timestamptz not null default now()
+);
+create index if not exists requests_business_idx on public.requests (business_id, created_at desc);
+create index if not exists requests_customer_idx on public.requests (customer_id, created_at desc);
+
+create or replace function public.requests_customer_name()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if new.customer_id is not null and new.customer_name is null then
+    new.customer_name := coalesce(public.short_name(new.customer_id), 'Cliente');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists requests_name on public.requests;
+create trigger requests_name
+  before insert on public.requests
+  for each row execute function public.requests_customer_name();
+
+-- ─────────────────────────────────────────────────────────────
+-- RLS
+-- ─────────────────────────────────────────────────────────────
+alter table public.specialties enable row level security;
+alter table public.business_photos enable row level security;
+alter table public.business_claims enable row level security;
+alter table public.posts enable row level security;
+alter table public.post_likes enable row level security;
+alter table public.post_comments enable row level security;
+alter table public.questions enable row level security;
+alter table public.answers enable row level security;
+alter table public.answer_helpful enable row level security;
+alter table public.requests enable row level security;
+
+drop policy if exists "especialidades públicas" on public.specialties;
+create policy "especialidades públicas" on public.specialties for select using (true);
+drop policy if exists "especialidades admin" on public.specialties;
+create policy "especialidades admin" on public.specialties for all using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "galería pública" on public.business_photos;
+create policy "galería pública" on public.business_photos for select using (true);
+drop policy if exists "galería del dueño" on public.business_photos;
+create policy "galería del dueño" on public.business_photos for all
+  using (public.owns_business(business_id) or public.is_admin()) with check (public.owns_business(business_id) or public.is_admin());
+
+drop policy if exists "ver mis reclamos" on public.business_claims;
+create policy "ver mis reclamos" on public.business_claims for select using (user_id = auth.uid() or public.is_admin());
+drop policy if exists "reclamar perfil" on public.business_claims;
+create policy "reclamar perfil" on public.business_claims for insert
+  with check (user_id = auth.uid() and status = 'pendiente'
+              and exists (select 1 from public.businesses b where b.id = business_id and b.owner_id is null));
+drop policy if exists "resolver reclamo" on public.business_claims;
+create policy "resolver reclamo" on public.business_claims for update using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "muro público" on public.posts;
+create policy "muro público" on public.posts for select using (not hidden or public.owns_business(business_id) or public.is_admin());
+drop policy if exists "publicar en el muro" on public.posts;
+create policy "publicar en el muro" on public.posts for insert with check (public.owns_business(business_id));
+drop policy if exists "editar mi publicación" on public.posts;
+create policy "editar mi publicación" on public.posts for update
+  using (public.owns_business(business_id) or public.is_admin()) with check (public.owns_business(business_id) or public.is_admin());
+drop policy if exists "borrar mi publicación" on public.posts;
+create policy "borrar mi publicación" on public.posts for delete using (public.owns_business(business_id) or public.is_admin());
+
+drop policy if exists "me gusta públicos" on public.post_likes;
+create policy "me gusta públicos" on public.post_likes for select using (true);
+drop policy if exists "dar me gusta" on public.post_likes;
+create policy "dar me gusta" on public.post_likes for insert with check (user_id = auth.uid());
+drop policy if exists "quitar me gusta" on public.post_likes;
+create policy "quitar me gusta" on public.post_likes for delete using (user_id = auth.uid());
+
+drop policy if exists "comentarios públicos" on public.post_comments;
+create policy "comentarios públicos" on public.post_comments for select using (true);
+drop policy if exists "comentar" on public.post_comments;
+create policy "comentar" on public.post_comments for insert with check (author_id = auth.uid() or public.is_admin());
+drop policy if exists "borrar comentario" on public.post_comments;
+create policy "borrar comentario" on public.post_comments for delete
+  using (author_id = auth.uid() or public.is_admin()
+         or exists (select 1 from public.posts p where p.id = post_id and public.owns_business(p.business_id)));
+
+drop policy if exists "preguntas públicas" on public.questions;
+create policy "preguntas públicas" on public.questions for select using (not hidden or author_id = auth.uid() or public.is_admin());
+drop policy if exists "preguntar" on public.questions;
+create policy "preguntar" on public.questions for insert with check (author_id = auth.uid() or public.is_admin());
+drop policy if exists "moderar preguntas" on public.questions;
+create policy "moderar preguntas" on public.questions for update using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "respuestas públicas" on public.answers;
+create policy "respuestas públicas" on public.answers for select using (true);
+drop policy if exists "responder" on public.answers;
+create policy "responder" on public.answers for insert with check (public.owns_business(business_id) or public.is_admin());
+drop policy if exists "editar mi respuesta" on public.answers;
+create policy "editar mi respuesta" on public.answers for update
+  using (public.owns_business(business_id) or public.is_admin()) with check (public.owns_business(business_id) or public.is_admin());
+
+drop policy if exists "útiles públicos" on public.answer_helpful;
+create policy "útiles públicos" on public.answer_helpful for select using (true);
+drop policy if exists "marcar útil" on public.answer_helpful;
+create policy "marcar útil" on public.answer_helpful for insert with check (user_id = auth.uid());
+drop policy if exists "quitar útil" on public.answer_helpful;
+create policy "quitar útil" on public.answer_helpful for delete using (user_id = auth.uid());
+
+drop policy if exists "ver solicitudes" on public.requests;
+create policy "ver solicitudes" on public.requests for select
+  using (customer_id = auth.uid() or public.owns_business(business_id) or public.is_admin());
+drop policy if exists "pedir cita o cotización" on public.requests;
+create policy "pedir cita o cotización" on public.requests for insert
+  with check (customer_id = auth.uid() and status = 'nueva' and quoted_price is null);
+drop policy if exists "responder solicitud" on public.requests;
+create policy "responder solicitud" on public.requests for update
+  using (customer_id = auth.uid() or public.owns_business(business_id))
+  with check (customer_id = auth.uid() or public.owns_business(business_id));
+
+-- ─────────────────────────────────────────────────────────────
+-- Permisos
+-- ─────────────────────────────────────────────────────────────
+grant select on public.specialties, public.business_photos, public.posts, public.post_likes,
+  public.post_comments, public.questions, public.answers, public.answer_helpful
+  to anon, authenticated;
+grant insert, update, delete on public.specialties, public.business_photos, public.posts to authenticated;
+grant insert, delete on public.post_likes, public.post_comments, public.answer_helpful to authenticated;
+grant insert, update on public.questions, public.answers to authenticated;
+grant select, insert, update on public.requests, public.business_claims to authenticated;
+
+grant execute on function public.my_business_slug() to authenticated;
+
 -- ════════ supabase/seed.sql ════════
--- Datos base: zonas y categorías iniciales (sin negocios de ejemplo)
+-- Datos base de Expertalia 360: zonas, categorías (profesionistas y oficios) y especialidades.
+-- Generado por apps/mobile/scripts/generate-demo-seed.ts a partir de src/data/mock.ts
 
 insert into public.zones (name, municipality, state, slug) values
-  ('Zen House', 'El Marqués', 'Querétaro', 'zen-house'),
-  ('Residencial del Parque', 'El Marqués', 'Querétaro', 'residencial-del-parque'),
-  ('El Mirador', 'El Marqués', 'Querétaro', 'el-mirador'),
-  ('Cumbres de Conín', 'El Marqués', 'Querétaro', 'cumbres-de-conin')
+  ('Querétaro Centro', 'Querétaro', 'Querétaro', 'queretaro-centro'),
+  ('Centro Sur', 'Querétaro', 'Querétaro', 'centro-sur'),
+  ('Centro Histórico', 'Querétaro', 'Querétaro', 'centro-historico'),
+  ('Juriquilla', 'Querétaro', 'Querétaro', 'juriquilla'),
+  ('El Marqués', 'Querétaro', 'Querétaro', 'el-marques'),
+  ('Querétaro', 'Querétaro', 'Querétaro', 'queretaro')
 on conflict (slug) do nothing;
 
-insert into public.categories (name, slug, color, icon, position) values
-  ('Comida', 'comida', '#E04A1F', 'comida', 1),
-  ('Café y postres', 'cafe-y-postres', '#FFC93C', 'cafe', 2),
-  ('Belleza', 'belleza', '#E8457C', 'belleza', 3),
-  ('Salud', 'salud', '#2D7FF9', 'salud', 4),
-  ('Profesionales', 'profesionales', '#7B4FE0', 'profesionales', 5),
-  ('Autos y talleres', 'autos-y-talleres', '#1F1A17', 'autos', 6),
-  ('Hogar y oficios', 'hogar-y-oficios', '#12A06E', 'hogar', 7),
-  ('Tiendas', 'tiendas', '#6A5F57', 'tiendas', 8)
-on conflict (slug) do nothing;
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Abogados', 'abogados', '#1F3A68', 'briefcase-outline', 1, 'profesionales', 'Abogado', 'balanza', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Familiar', 'familia', array['divorcio', 'pensión', 'pension', 'custodia', 'patria potestad', 'adopción']::text[], 0 from public.categories where slug = 'abogados' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Laboral', 'portafolio', array['despido', 'finiquito', 'liquidación', 'demanda laboral', 'trabajo', 'imss']::text[], 1 from public.categories where slug = 'abogados' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Mercantil y corporativo', 'edificio', array['empresa', 'sociedad', 'contrato', 'socios', 'cobranza', 'pagaré']::text[], 2 from public.categories where slug = 'abogados' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Penal', 'candado', array['denuncia', 'delito', 'detenido', 'fraude', 'amparo']::text[], 3 from public.categories where slug = 'abogados' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Civil e inmobiliario', 'casa', array['arrendamiento', 'renta', 'inquilino', 'compraventa', 'herencia', 'testamento', 'juicio']::text[], 4 from public.categories where slug = 'abogados' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Migratorio', 'mundo', array['visa', 'residencia', 'migración', 'pasaporte', 'naturalización']::text[], 5 from public.categories where slug = 'abogados' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Fiscal', 'gobierno', array['sat', 'multa', 'crédito fiscal', 'embargo']::text[], 6 from public.categories where slug = 'abogados' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Contadores', 'contadores', '#1E8E6A', 'calculator-outline', 2, 'profesionales', 'Contador', 'abaco', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Declaración anual', 'recibo', array['declaración', 'declaracion', 'saldo a favor', 'devolución', 'impuestos']::text[], 0 from public.categories where slug = 'contadores' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'RESICO y personas físicas', 'laptop', array['resico', 'freelance', 'honorarios', 'arrendamiento']::text[], 1 from public.categories where slug = 'contadores' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Contabilidad de empresas', 'grafica', array['contabilidad', 'pyme', 'empresa', 'balance']::text[], 2 from public.categories where slug = 'contadores' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Nómina e IMSS', 'personas', array['nómina', 'nomina', 'imss', 'infonavit', 'empleados']::text[], 3 from public.categories where slug = 'contadores' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Defensa ante el SAT', 'escudo', array['requerimiento', 'sat', 'multa', 'auditoría', 'buzón tributario']::text[], 4 from public.categories where slug = 'contadores' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Facturación', 'recibo', array['factura', 'cfdi', 'timbrado']::text[], 5 from public.categories where slug = 'contadores' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Notarías y trámites', 'notarias-y-tramites', '#E3B04B', 'document-text-outline', 3, 'profesionales', 'Notario o gestor', 'pergamino', '#121A2B')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Escrituras', 'casa', array['escritura', 'compraventa', 'casa', 'terreno']::text[], 0 from public.categories where slug = 'notarias-y-tramites' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Testamentos', 'pergamino', array['testamento', 'herencia']::text[], 1 from public.categories where slug = 'notarias-y-tramites' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Poderes notariales', 'nota', array['poder', 'carta poder']::text[], 2 from public.categories where slug = 'notarias-y-tramites' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Traducción certificada', 'globo_texto', array['traducción', 'traduccion', 'perito traductor', 'apostilla']::text[], 3 from public.categories where slug = 'notarias-y-tramites' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Gestoría', 'portapapeles', array['placas', 'licencia', 'cita sat', 'e.firma', 'trámite']::text[], 4 from public.categories where slug = 'notarias-y-tramites' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Psicología y salud', 'psicologia-y-salud', '#C2477A', 'heart-outline', 4, 'profesionales', 'Especialista', 'cerebro', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Terapia individual', 'cerebro', array['terapia', 'psicólogo', 'psicologo', 'depresión']::text[], 0 from public.categories where slug = 'psicologia-y-salud' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Terapia de pareja', 'anillo', array['pareja', 'matrimonio']::text[], 1 from public.categories where slug = 'psicologia-y-salud' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Ansiedad y estrés', 'pensando', array['ansiedad', 'estrés', 'estres', 'pánico']::text[], 2 from public.categories where slug = 'psicologia-y-salud' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Nutrición', 'regadera', array['nutriólogo', 'dieta', 'nutricion']::text[], 3 from public.categories where slug = 'psicologia-y-salud' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Fisioterapia', 'hospital', array['fisioterapia', 'lesión', 'rehabilitación', 'espalda']::text[], 4 from public.categories where slug = 'psicologia-y-salud' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Arquitectura e ingeniería', 'arquitectura', '#121A2B', 'business-outline', 5, 'profesionales', 'Arquitecto o ingeniero', 'construccion', '#E3B04B')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Proyecto arquitectónico', 'escuadra', array['planos', 'diseño', 'casa nueva']::text[], 0 from public.categories where slug = 'arquitectura' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Licencias de construcción', 'portapapeles', array['licencia', 'permiso', 'construcción']::text[], 1 from public.categories where slug = 'arquitectura' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Remodelación', 'ladrillos', array['remodelar', 'ampliación', 'cocina', 'baño']::text[], 2 from public.categories where slug = 'arquitectura' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Avalúos', 'dinero', array['avalúo', 'avaluo', 'valor de mi casa']::text[], 3 from public.categories where slug = 'arquitectura' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Cálculo estructural', 'construccion', array['estructura', 'grietas', 'cimentación']::text[], 4 from public.categories where slug = 'arquitectura' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Consultoría y seguros', 'consultoria', '#6B4FC8', 'trending-up-outline', 6, 'profesionales', 'Consultor', 'grafica', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Mejora de procesos', 'grafica', array['procesos', 'eficiencia', 'costos', 'indicadores']::text[], 0 from public.categories where slug = 'consultoria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Finanzas para PyME', 'dinero', array['finanzas', 'flujo', 'crédito', 'precios']::text[], 1 from public.categories where slug = 'consultoria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Marketing digital', 'megafono', array['redes sociales', 'publicidad', 'página web', 'marketing']::text[], 2 from public.categories where slug = 'consultoria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Seguros de gastos médicos', 'hospital', array['seguro médico', 'gastos médicos', 'hospital']::text[], 3 from public.categories where slug = 'consultoria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Seguros de vida y retiro', 'escudo', array['seguro de vida', 'retiro', 'ahorro', 'afore']::text[], 4 from public.categories where slug = 'consultoria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Plomería', 'plomeria', '#2F80ED', 'water-outline', 7, 'oficios', 'Plomero', 'destapador', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Fugas de agua', 'gota', array['fuga', 'gotea', 'humedad', 'goteo']::text[], 0 from public.categories where slug = 'plomeria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Calentadores', 'regadera', array['calentador', 'boiler', 'agua caliente']::text[], 1 from public.categories where slug = 'plomeria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Destapes y drenaje', 'destapador', array['destape', 'tapado', 'drenaje', 'coladera']::text[], 2 from public.categories where slug = 'plomeria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Tinacos y cisternas', 'gota', array['tinaco', 'cisterna', 'bomba']::text[], 3 from public.categories where slug = 'plomeria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Instalación hidráulica', 'llave_inglesa', array['tubería', 'instalación', 'baño nuevo']::text[], 4 from public.categories where slug = 'plomeria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Electricidad', 'electricidad', '#C98A0B', 'flash-outline', 8, 'oficios', 'Electricista', 'foco', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Cortos y fallas', 'enchufe', array['corto', 'se fue la luz', 'pastilla', 'apagón', 'falla eléctrica']::text[], 0 from public.categories where slug = 'electricidad' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Instalaciones eléctricas', 'foco', array['instalación eléctrica', 'cableado', 'contactos', 'apagadores']::text[], 1 from public.categories where slug = 'electricidad' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Paneles solares', 'foco', array['panel solar', 'solar', 'recibo cfe']::text[], 2 from public.categories where slug = 'electricidad' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Cámaras y seguridad', 'camara', array['cámaras', 'cctv', 'alarma', 'interfón']::text[], 3 from public.categories where slug = 'electricidad' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Carpintería', 'carpinteria', '#8A5A2B', 'hammer-outline', 9, 'oficios', 'Carpintero', 'serrucho', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Muebles a medida', 'serrucho', array['mueble', 'librero', 'mesa']::text[], 0 from public.categories where slug = 'carpinteria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Closets y cocinas', 'puerta', array['closet', 'cocina integral', 'alacena']::text[], 1 from public.categories where slug = 'carpinteria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Puertas y ventanas', 'puerta', array['puerta', 'ventana', 'marco']::text[], 2 from public.categories where slug = 'carpinteria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Reparación de muebles', 'herramientas', array['reparar', 'barniz', 'restaurar']::text[], 3 from public.categories where slug = 'carpinteria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Climas y electrodomésticos', 'climas', '#1B8FA6', 'snow-outline', 10, 'oficios', 'Técnico', 'copo', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Minisplits', 'copo', array['minisplit', 'aire acondicionado', 'clima']::text[], 0 from public.categories where slug = 'climas' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Refrigeradores', 'copo', array['refrigerador', 'refri', 'no enfría']::text[], 1 from public.categories where slug = 'climas' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Lavadoras y secadoras', 'herramientas', array['lavadora', 'secadora']::text[], 2 from public.categories where slug = 'climas' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Pintura y albañilería', 'pintura-y-albanileria', '#146B4F', 'color-fill-outline', 11, 'oficios', 'Maestro de obra', 'brocha', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Pintura', 'brocha', array['pintar', 'pintura', 'fachada']::text[], 0 from public.categories where slug = 'pintura-y-albanileria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Impermeabilización', 'paraguas', array['impermeabilizar', 'goteras', 'techo']::text[], 1 from public.categories where slug = 'pintura-y-albanileria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Albañilería', 'ladrillos', array['barda', 'muro', 'piso', 'azulejo']::text[], 2 from public.categories where slug = 'pintura-y-albanileria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+
+insert into public.categories (name, slug, color, icon, position, world, professional, emoji, ink) values ('Cerrajería', 'cerrajeria', '#56607A', 'key-outline', 12, 'oficios', 'Cerrajero', 'llave', '#FFFFFF')
+  on conflict (slug) do update set name = excluded.name, color = excluded.color, icon = excluded.icon, position = excluded.position, world = excluded.world, professional = excluded.professional, emoji = excluded.emoji, ink = excluded.ink;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Aperturas', 'puerta', array['me quedé afuera', 'abrir puerta', 'llaves adentro']::text[], 0 from public.categories where slug = 'cerrajeria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Cambio de chapas', 'candado', array['chapa', 'cerradura', 'combinación']::text[], 1 from public.categories where slug = 'cerrajeria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
+insert into public.specialties (category_id, name, emoji, keywords, position) select id, 'Llaves de auto', 'llave', array['llave de auto', 'control', 'duplicado']::text[], 2 from public.categories where slug = 'cerrajeria' on conflict (category_id, name) do update set emoji = excluded.emoji, keywords = excluded.keywords, position = excluded.position;
 
 -- ════════ supabase/seed_demo.sql ════════
--- Negocios de ejemplo (ficticios) para probar la app. Generado por apps/mobile/scripts/generate-demo-seed.ts
--- Para borrarlos: delete from public.businesses where slug in (...);
+-- Profesionistas y oficios de ejemplo (ficticios) para probar la app.
+-- Generado por apps/mobile/scripts/generate-demo-seed.ts a partir de src/data/mock.ts
+-- No tienen dueño: cualquier profesional real puede "reclamar" su perfil desde la app.
+-- Para borrarlos todos: delete from public.businesses where owner_id is null;
 
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Café La Esquina', 'cafe-la-esquina', 'Cafetería · waffles', 'Café de especialidad y waffles belgas hechos al momento. Pet friendly.',
-  (select id from public.categories where slug = 'cafe-y-postres'),
-  (select id from public.zones where slug = 'zen-house'),
-  '5214420000101', '5214420000101', 'Av. Zen 120, local 4',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3301, 20.6022), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, '2x1 en waffles de 4 a 6 pm'
-where not exists (select 1 from public.businesses where slug = 'cafe-la-esquina');
-
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'cafe-la-esquina'), 'ordenar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cafe-la-esquina'), 0, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cafe-la-esquina'), 1, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cafe-la-esquina'), 2, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cafe-la-esquina'), 3, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cafe-la-esquina'), 4, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cafe-la-esquina'), 5, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cafe-la-esquina'), 6, '09:00', '21:00') on conflict do nothing;
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'producto', 'Americano grande', '16 oz, grano de Veracruz', 'Café', 45, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and name = 'Americano grande');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'producto', 'Latte', 'Leche entera o de avena', 'Café', 58, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and name = 'Latte');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'producto', 'Waffle de fresa', 'Fresas, crema y miel', 'Waffles', 95, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and name = 'Waffle de fresa');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'producto', 'Waffle Nutella', 'Nutella y plátano', 'Waffles', 105, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and name = 'Waffle Nutella');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'producto', 'Limonada natural', '500 ml', 'Bebidas', 40, null, true, 4 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and name = 'Limonada natural');
-insert into public.loyalty_programs (business_id, kind, goal, percent, reward) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'sellos', 10, null, 'Café americano gratis' where not exists (select 1 from public.loyalty_programs where business_id = (select id from public.businesses where slug = 'cafe-la-esquina'));
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'Rodrigo M.', 5, 'El waffle de fresa es otro nivel y ya voy en mi sello 6.', '¡Gracias, Rodrigo! Te esperamos por el séptimo.' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and author_name = 'Rodrigo M.' and body = 'El waffle de fresa es otro nivel y ya voy en mi sello 6.');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'Lucía P.', 5, 'Lugar acogedor, buen café y precios justos.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and author_name = 'Lucía P.' and body = 'Lugar acogedor, buen café y precios justos.');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'cafe-la-esquina'), 'Javier R.', 4, 'Ricos waffles, en fin de semana tardan un poco.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and author_name = 'Javier R.' and body = 'Ricos waffles, en fin de semana tardan un poco.');
-
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Fonda Doña Lupe', 'fonda-dona-lupe', 'Comida casera', 'Comida corrida, guisos y antojitos. Menú del día de lunes a sábado.',
-  (select id from public.categories where slug = 'comida'),
-  (select id from public.zones where slug = 'residencial-del-parque'),
-  '5214420000102', '5214420000102', 'Calle Bambú 33',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3272, 20.5998), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, 'Postre gratis en pedidos desde $250'
-where not exists (select 1 from public.businesses where slug = 'fonda-dona-lupe');
-
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'fonda-dona-lupe'), 'ordenar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'fonda-dona-lupe'), 0, '09:00', '18:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'fonda-dona-lupe'), 1, '09:00', '18:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'fonda-dona-lupe'), 2, '09:00', '18:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'fonda-dona-lupe'), 3, '09:00', '18:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'fonda-dona-lupe'), 4, '09:00', '18:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'fonda-dona-lupe'), 5, '09:00', '18:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'fonda-dona-lupe'), 6, '09:00', '18:00') on conflict do nothing;
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'producto', 'Comida corrida', 'Sopa, guisado, arroz, frijoles y agua', 'Menú del día', 110, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe') and name = 'Comida corrida');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'producto', 'Enchiladas suizas', 'Pollo, salsa verde cremosa', 'Guisos', 135, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe') and name = 'Enchiladas suizas');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'producto', 'Chiles rellenos', 'De queso, con arroz', 'Guisos', 125, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe') and name = 'Chiles rellenos');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'producto', 'Orden de sopes', '3 piezas', 'Antojitos', 75, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe') and name = 'Orden de sopes');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'producto', 'Agua de jamaica', '1 litro', 'Bebidas', 35, null, true, 4 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe') and name = 'Agua de jamaica');
-insert into public.loyalty_programs (business_id, kind, goal, percent, reward) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'sellos', 8, null, 'Comida corrida gratis' where not exists (select 1 from public.loyalty_programs where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe'));
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'Ana G.', 5, 'Sabe como en casa, y el pedido llegó caliente.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe') and author_name = 'Ana G.' and body = 'Sabe como en casa, y el pedido llegó caliente.');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'Pedro S.', 4, 'Muy rico, porciones grandes.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe') and author_name = 'Pedro S.' and body = 'Muy rico, porciones grandes.');
-
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Taquería El Güero', 'taqueria-el-guero', 'Tacos · por la noche', 'Tacos al pastor, suadero y campechanos. Abierto de 7 pm a 1 am.',
-  (select id from public.categories where slug = 'comida'),
-  (select id from public.zones where slug = 'zen-house'),
-  '5214420000103', '5214420000103', 'Av. Constituyentes 812',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3265, 20.6041), 4326)::extensions.geography,
-  false, true, false, 'plata', 'activo', true, null
-where not exists (select 1 from public.businesses where slug = 'taqueria-el-guero');
-
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'taqueria-el-guero'), 'ordenar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taqueria-el-guero'), 0, '09:00', '01:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taqueria-el-guero'), 1, '09:00', '01:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taqueria-el-guero'), 2, '09:00', '01:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taqueria-el-guero'), 3, '09:00', '01:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taqueria-el-guero'), 4, '09:00', '01:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taqueria-el-guero'), 5, '09:00', '01:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taqueria-el-guero'), 6, '09:00', '01:00') on conflict do nothing;
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'taqueria-el-guero'), 'producto', 'Taco al pastor', null, 'Tacos', 18, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'taqueria-el-guero') and name = 'Taco al pastor');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'taqueria-el-guero'), 'producto', 'Taco de suadero', null, 'Tacos', 18, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'taqueria-el-guero') and name = 'Taco de suadero');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'taqueria-el-guero'), 'producto', 'Gringa', null, 'Tacos', 55, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'taqueria-el-guero') and name = 'Gringa');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'taqueria-el-guero'), 'Luis T.', 5, 'El mejor pastor de la zona.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'taqueria-el-guero') and author_name = 'Luis T.' and body = 'El mejor pastor de la zona.');
-
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Barbería El Bigote', 'barberia-el-bigote', 'Barbería', 'Cortes clásicos y modernos, barba con toalla caliente.',
-  (select id from public.categories where slug = 'belleza'),
-  (select id from public.zones where slug = 'residencial-del-parque'),
-  '5214420000104', '5214420000104', 'Plaza Zen, local 12',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3318, 20.6008), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, '10% de descuento al reservar por Expertalia 360'
-where not exists (select 1 from public.businesses where slug = 'barberia-el-bigote');
-
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'barberia-el-bigote'), 'reservar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'barberia-el-bigote'), 0, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'barberia-el-bigote'), 1, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'barberia-el-bigote'), 2, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'barberia-el-bigote'), 3, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'barberia-el-bigote'), 4, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'barberia-el-bigote'), 5, '09:00', '21:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'barberia-el-bigote'), 6, '09:00', '21:00') on conflict do nothing;
-insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'barberia-el-bigote'), 'Luis' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'barberia-el-bigote') and name = 'Luis');
-insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'barberia-el-bigote'), 'Toño' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'barberia-el-bigote') and name = 'Toño');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'barberia-el-bigote'), 'cita', 'Corte clásico', null, null, 180, 40, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'barberia-el-bigote') and name = 'Corte clásico');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'barberia-el-bigote'), 'cita', 'Corte y barba', null, null, 260, 60, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'barberia-el-bigote') and name = 'Corte y barba');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'barberia-el-bigote'), 'cita', 'Corte infantil', null, null, 150, 30, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'barberia-el-bigote') and name = 'Corte infantil');
-insert into public.loyalty_programs (business_id, kind, goal, percent, reward) select (select id from public.businesses where slug = 'barberia-el-bigote'), 'sellos', 6, null, '50% en tu sexto corte' where not exists (select 1 from public.loyalty_programs where business_id = (select id from public.businesses where slug = 'barberia-el-bigote'));
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'barberia-el-bigote'), 'Rodrigo M.', 5, 'Llegué a la hora y me atendieron de inmediato.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'barberia-el-bigote') and author_name = 'Rodrigo M.' and body = 'Llegué a la hora y me atendieron de inmediato.');
-
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Estética Bella Luna', 'estetica-bella-luna', 'Salón de belleza', 'Corte, color, uñas y pestañas. Productos profesionales.',
-  (select id from public.categories where slug = 'belleza'),
-  (select id from public.zones where slug = 'el-mirador'),
-  '5214420000105', '5214420000105', 'Calle Loto 18',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3335, 20.5985), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, '30% en tu primera visita'
-where not exists (select 1 from public.businesses where slug = 'estetica-bella-luna');
-
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'estetica-bella-luna'), 'reservar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'estetica-bella-luna'), 0, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'estetica-bella-luna'), 1, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'estetica-bella-luna'), 2, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'estetica-bella-luna'), 3, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'estetica-bella-luna'), 4, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'estetica-bella-luna'), 5, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'estetica-bella-luna'), 6, '09:00', '20:00') on conflict do nothing;
-insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'estetica-bella-luna'), 'Karla' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'estetica-bella-luna') and name = 'Karla');
-insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'estetica-bella-luna'), 'Mónica' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'estetica-bella-luna') and name = 'Mónica');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'estetica-bella-luna'), 'cita', 'Corte de dama', null, null, 250, 45, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'estetica-bella-luna') and name = 'Corte de dama');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'estetica-bella-luna'), 'cita', 'Tinte completo', null, null, 650, 120, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'estetica-bella-luna') and name = 'Tinte completo');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'estetica-bella-luna'), 'cita', 'Uñas en gel', null, null, 320, 60, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'estetica-bella-luna') and name = 'Uñas en gel');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'estetica-bella-luna'), 'Claudia R.', 5, 'Me encantó el color, muy profesionales.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'estetica-bella-luna') and author_name = 'Claudia R.' and body = 'Me encantó el color, muy profesionales.');
-
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Dental Sonríe', 'dental-sonrie', 'Consultorio dental', 'Limpieza, resinas, ortodoncia y urgencias dentales.',
-  (select id from public.categories where slug = 'salud'),
-  (select id from public.zones where slug = 'residencial-del-parque'),
-  '5214420000106', '5214420000106', 'Blvd. Zen 450, consultorio 3',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3342, 20.6031), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, '2x1 en limpieza dental'
-where not exists (select 1 from public.businesses where slug = 'dental-sonrie');
-
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'dental-sonrie'), 'reservar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'dental-sonrie'), 0, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'dental-sonrie'), 1, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'dental-sonrie'), 2, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'dental-sonrie'), 3, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'dental-sonrie'), 4, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'dental-sonrie'), 5, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'dental-sonrie'), 6, '09:00', '19:00') on conflict do nothing;
-insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'dental-sonrie'), 'Dra. Pérez' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'dental-sonrie') and name = 'Dra. Pérez');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'dental-sonrie'), 'cita', 'Limpieza dental', null, null, 450, 40, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'dental-sonrie') and name = 'Limpieza dental');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'dental-sonrie'), 'cita', 'Valoración', null, null, 200, 20, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'dental-sonrie') and name = 'Valoración');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'dental-sonrie'), 'cotizacion', 'Ortodoncia', 'Precio según valoración', null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'dental-sonrie') and name = 'Ortodoncia');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'dental-sonrie'), 'Marta L.', 5, 'Sin dolor y muy bien explicado.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'dental-sonrie') and author_name = 'Marta L.' and body = 'Sin dolor y muy bien explicado.');
-
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Lic. Mariana Ortiz', 'lic-mariana-ortiz', 'Abogada · derecho familiar', 'Divorcios, pensiones, custodia y testamentos. 12 años de experiencia. Cédula verificada.',
-  (select id from public.categories where slug = 'profesionales'),
-  (select id from public.zones where slug = 'zen-house'),
-  '5214420000107', '5214420000107', 'Plaza Zen, local 8',
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Lic. Mariana Ortiz', 'lic-mariana-ortiz', 'Abogada · familiar y civil', 'Te acompaño en divorcios, pensiones alimenticias, custodia, testamentos y juicios de arrendamiento. Explico cada paso con claridad y te doy cotización por escrito antes de empezar.',
+  (select id from public.categories where slug = 'abogados'),
+  (select id from public.zones where slug = 'queretaro-centro'),
+  '5214420000101', '5214420000101', 'Plaza Zen, local 8',
   extensions.st_setsrid(extensions.st_makepoint(-100.3254, 20.6012), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null
+  true, true, false, 'plata', 'activo', true, 'Primera consulta en línea a $350',
+  'Abogada', array['Familiar', 'Civil e inmobiliario']::text[], 12, 'Cédula 7845120', 'Licenciatura en Derecho, UAQ · Maestría en Derecho Familiar', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 500, 'Responde en menos de 2 h', 'Plaza Zen, planta alta, local 8. Frente al Oxxo; hay estacionamiento de la plaza.', false, null, null, null
 where not exists (select 1 from public.businesses where slug = 'lic-mariana-ortiz');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 'reservar') on conflict do nothing;
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cotizar') on conflict do nothing;
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 'consulta') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 0, '09:00', '18:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 1, '09:00', '18:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 2, '09:00', '18:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 3, '09:00', '18:00') on conflict do nothing;
@@ -1013,124 +1389,510 @@ insert into public.business_hours (business_id, weekday, opens, closes) values (
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 5, '09:00', '18:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 6, '09:00', '18:00') on conflict do nothing;
 insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'Lic. Ortiz' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Lic. Ortiz');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cita', 'Consulta inicial', 'En despacho o videollamada', null, 500, 30, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Consulta inicial');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cotizacion', 'Divorcio voluntario', 'Precio según el caso', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Divorcio voluntario');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cotizacion', 'Pensión alimenticia', 'Precio según el caso', null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Pensión alimenticia');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'Claudia R.', 5, 'Me explicó todo con claridad y la cotización llegó el mismo día.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and author_name = 'Claudia R.' and body = 'Me explicó todo con claridad y la cotización llegó el mismo día.');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cita', 'Consulta inicial', 'En despacho o videollamada', 'Consultas', 500, 45, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Consulta inicial');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cotizacion', 'Divorcio voluntario', 'Honorarios según el caso', 'Familiar', null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Divorcio voluntario');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cotizacion', 'Pensión alimenticia', 'Solicitud o modificación', 'Familiar', null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Pensión alimenticia');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cotizacion', 'Testamento', 'Incluye acompañamiento a notaría', 'Civil', null, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Testamento');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'cotizacion', 'Juicio de arrendamiento', 'Desalojo o cobro de rentas', 'Civil', null, null, true, 4 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Juicio de arrendamiento');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'producto', 'Revisión de contrato de arrendamiento', 'Entrega por escrito en 48 h', 'Paquetes', 900, null, true, 5 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and name = 'Revisión de contrato de arrendamiento');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), null, 'Sala de juntas del despacho', '#DCE4F2', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and caption = 'Sala de juntas del despacho');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), null, 'Recepción', '#E9E2FA', 1 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and caption = 'Recepción');
+insert into public.loyalty_programs (business_id, kind, goal, percent, reward) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'sellos', 5, null, 'Quinta consulta sin costo' where not exists (select 1 from public.loyalty_programs where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz'));
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'Claudia R.', 5, 'Me explicó todo con claridad y la cotización llegó el mismo día. Mi divorcio quedó en tres meses.', 'Gracias, Claudia. Fue un gusto acompañarte.', now() - interval '1 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and author_name = 'Claudia R.' and body = 'Me explicó todo con claridad y la cotización llegó el mismo día. Mi divorcio quedó en tres meses.');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'Pedro S.', 5, 'Muy humana en un momento difícil. Siempre contestó mis dudas.', null, now() - interval '2 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and author_name = 'Pedro S.' and body = 'Muy humana en un momento difícil. Siempre contestó mis dudas.');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'Usuario verificado', 4, 'Buena abogada, los tiempos del juzgado se alargaron pero ella me mantuvo informado.', null, now() - interval '3 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and author_name = 'Usuario verificado' and body = 'Buena abogada, los tiempos del juzgado se alargaron pero ella me mantuvo informado.');
+update public.businesses set rating_avg = 5.0, rating_count = 41, verified = true where slug = 'lic-mariana-ortiz';
 
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Taller Mecánico López', 'taller-mecanico-lopez', 'Mecánica general', 'Frenos, afinación, suspensión y diagnóstico por computadora.',
-  (select id from public.categories where slug = 'autos-y-talleres'),
-  (select id from public.zones where slug = 'cumbres-de-conin'),
-  '5214420000108', '5214420000108', 'Av. Industrial 77',
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Ortiz Salinas Abogados', 'ortiz-salinas-abogados', 'Despacho · empresas y fiscal', 'Constitución de sociedades, contratos, defensa fiscal y laboral para empresas. Igualas mensuales para PyMEs.',
+  (select id from public.categories where slug = 'abogados'),
+  (select id from public.zones where slug = 'centro-sur'),
+  '5214420000102', '5214420000102', 'Blvd. Bernardo Quintana 450, piso 7',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3265, 20.6041), 4326)::extensions.geography,
+  true, true, false, 'plata', 'activo', true, null,
+  'Despacho de abogados', array['Mercantil y corporativo', 'Fiscal', 'Laboral']::text[], 18, '6 abogados con cédula verificada', 'Socios egresados de la Escuela Libre de Derecho y el ITAM', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 1200, 'Responde el mismo día', null, false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'ortiz-salinas-abogados');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'cotizar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'consulta') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 1, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 2, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 3, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 4, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 5, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 6, '09:00', '19:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'Lic. Salinas' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and name = 'Lic. Salinas');
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'Lic. Ortega' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and name = 'Lic. Ortega');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'cita', 'Consulta empresarial', '45 min con un socio', 'Consultas', 1200, 45, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and name = 'Consulta empresarial');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'cotizacion', 'Constitución de sociedad', 'S.A. de C.V. o S.A.S.', 'Corporativo', null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and name = 'Constitución de sociedad');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'cotizacion', 'Revisión de contrato', null, 'Corporativo', null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and name = 'Revisión de contrato');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'cotizacion', 'Defensa de crédito fiscal', null, 'Fiscal', null, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and name = 'Defensa de crédito fiscal');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'Luis T.', 5, 'Constituimos la empresa en tiempo récord y sin sorpresas en el costo.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and author_name = 'Luis T.' and body = 'Constituimos la empresa en tiempo récord y sin sorpresas en el costo.');
+update public.businesses set rating_avg = 4.8, rating_count = 67, verified = true where slug = 'ortiz-salinas-abogados';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Lic. Roberto Campos', 'lic-roberto-campos', 'Abogado · laboral', 'Despidos injustificados, finiquitos, demandas y conciliación laboral. Reviso tu caso sin costo y solo cobro si recuperas.',
+  (select id from public.categories where slug = 'abogados'),
+  (select id from public.zones where slug = 'centro-historico'),
+  '5214420000103', '5214420000103', 'Calle Madero 33, despacho 2',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3318, 20.6008), 4326)::extensions.geography,
+  true, true, false, 'plata', 'activo', true, null,
+  'Abogado', array['Laboral']::text[], 9, 'Cédula 9120334', 'Licenciatura en Derecho, UNAM', array['Español']::text[], array['despacho', 'en_linea']::text[], 0, 'Responde en menos de 1 h', null, false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'lic-roberto-campos');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 'cotizar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 'consulta') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 1, '09:00', '18:30') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 2, '09:00', '18:30') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 3, '09:00', '18:30') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 4, '09:00', '18:30') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 5, '09:00', '18:30') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 6, '09:00', '18:30') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'Lic. Campos' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and name = 'Lic. Campos');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'cita', 'Revisión de caso', 'Trae tu contrato y recibos', null, 0, 30, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and name = 'Revisión de caso');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'cotizacion', 'Demanda por despido', 'Honorarios sobre lo recuperado', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and name = 'Demanda por despido');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'Jorge V.', 5, 'Recuperé mi finiquito completo. Siempre me tuvo al tanto.', null, now() - interval '3 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and author_name = 'Jorge V.' and body = 'Recuperé mi finiquito completo. Siempre me tuvo al tanto.');
+update public.businesses set rating_avg = 4.7, rating_count = 58, verified = true where slug = 'lic-roberto-campos';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Lic. Daniela Treviño', 'lic-daniela-trevino', 'Abogada · migratorio y penal', 'Residencias, regularización migratoria, naturalización y defensa penal. Atiendo en tres idiomas.',
+  (select id from public.categories where slug = 'abogados'),
+  (select id from public.zones where slug = 'juriquilla'),
+  '5214420000104', '5214420000104', 'Atención en línea',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3335, 20.5985), 4326)::extensions.geography,
+  true, true, false, 'plata', 'activo', true, null,
+  'Abogada', array['Migratorio', 'Penal']::text[], 7, 'Cédula 10233871', 'Licenciatura en Derecho, Tec de Monterrey', array['Español', 'Inglés', 'Francés']::text[], array['en_linea', 'despacho']::text[], 600, 'Responde en menos de 3 h', null, false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'lic-daniela-trevino');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 'cotizar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 'consulta') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 1, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 2, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 3, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 4, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 5, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 6, '09:00', '20:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'lic-daniela-trevino'), 'Lic. Treviño' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'lic-daniela-trevino') and name = 'Lic. Treviño');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-daniela-trevino'), 'cita', 'Consulta migratoria', 'Videollamada', null, 600, 40, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-daniela-trevino') and name = 'Consulta migratoria');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-daniela-trevino'), 'cotizacion', 'Residencia temporal o permanente', null, null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-daniela-trevino') and name = 'Residencia temporal o permanente');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-daniela-trevino'), 'cotizacion', 'Defensa penal', null, null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-daniela-trevino') and name = 'Defensa penal');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-daniela-trevino'), 'Michael B.', 5, 'Got my permanent residency without a single trip back to the office. Excelente.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-daniela-trevino') and author_name = 'Michael B.' and body = 'Got my permanent residency without a single trip back to the office. Excelente.');
+update public.businesses set rating_avg = 4.9, rating_count = 33, verified = true where slug = 'lic-daniela-trevino';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Despacho Contable Reyes', 'despacho-contable-reyes', 'Contadores · personas y empresas', 'Contabilidad mensual, declaraciones, nómina y defensa ante el SAT para personas físicas, RESICO y PyMEs.',
+  (select id from public.categories where slug = 'contadores'),
+  (select id from public.zones where slug = 'queretaro-centro'),
+  '5214420000105', '5214420000105', 'Av. Zaragoza 120, piso 3',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3301, 20.6022), 4326)::extensions.geography,
+  true, true, false, 'plata', 'activo', true, null,
+  'Contadores públicos', array['Declaración anual', 'Contabilidad de empresas', 'Defensa ante el SAT', 'Nómina e IMSS']::text[], 15, 'C.P.C. Héctor Reyes · Cédula 4410982', 'Contaduría Pública, UAQ · Certificación IMCP', array['Español']::text[], array['despacho', 'en_linea']::text[], 0, 'Responde el mismo día', 'Edificio gris de 4 pisos, piso 3. Entrada por Zaragoza, a media cuadra del jardín.', false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'despacho-contable-reyes');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 'cotizar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 'consulta') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 1, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 2, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 3, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 4, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 5, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 6, '09:00', '19:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'C.P. Héctor Reyes' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'C.P. Héctor Reyes');
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'C.P. Sofía Reyes' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'C.P. Sofía Reyes');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'cita', 'Asesoría fiscal', 'En despacho o videollamada', null, 0, 30, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'Asesoría fiscal');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'cotizacion', 'Declaración anual persona física', 'Desde $1,200', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'Declaración anual persona física');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'cotizacion', 'Contabilidad mensual PyME', 'Desde $3,500 al mes', null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'Contabilidad mensual PyME');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'cotizacion', 'Respuesta a requerimiento del SAT', null, null, null, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'Respuesta a requerimiento del SAT');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'producto', 'Declaración anual persona física', 'Sueldos, honorarios o arrendamiento', 'Paquetes', 1200, null, true, 4 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'Declaración anual persona física');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'producto', 'Declaración mensual RESICO', 'Incluye revisión de facturas', 'Paquetes', 650, null, true, 5 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'Declaración mensual RESICO');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'producto', 'Alta en el SAT y e.firma', 'Te acompañamos a la cita', 'Trámites', 900, null, true, 6 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and name = 'Alta en el SAT y e.firma');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), null, 'Despacho', '#DDF1EA', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and caption = 'Despacho');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'despacho-contable-reyes'), null, 'Área de atención', '#E1E8F4', 1 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and caption = 'Área de atención');
+insert into public.loyalty_programs (business_id, kind, goal, percent, reward) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'sellos', 12, null, 'Un mes de contabilidad gratis' where not exists (select 1 from public.loyalty_programs where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes'));
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'Rodrigo M.', 5, 'Me sacaron de un requerimiento del SAT en una semana. Muy claros con los costos.', null, now() - interval '2 days' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and author_name = 'Rodrigo M.' and body = 'Me sacaron de un requerimiento del SAT en una semana. Muy claros con los costos.');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'Lucía P.', 5, 'Mi declaración anual quedó en un día y con saldo a favor.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and author_name = 'Lucía P.' and body = 'Mi declaración anual quedó en un día y con saldo a favor.');
+update public.businesses set rating_avg = 4.9, rating_count = 132, verified = true where slug = 'despacho-contable-reyes';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'C.P. Laura Méndez', 'cp-laura-mendez', 'Contadora · freelancers y RESICO', 'Declaraciones para freelancers, creadores de contenido y pequeños negocios. Todo en línea, sin papeles.',
+  (select id from public.categories where slug = 'contadores'),
+  (select id from public.zones where slug = 'juriquilla'),
+  '5214420000106', '5214420000106', 'Atención en línea',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3302, 20.5979), 4326)::extensions.geography,
+  true, true, false, 'plata', 'activo', true, null,
+  'Contadora', array['RESICO y personas físicas', 'Declaración anual', 'Facturación']::text[], 6, 'Cédula 11092376', 'Contaduría, UVM', array['Español']::text[], array['en_linea']::text[], 350, 'Responde en menos de 1 h', null, false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'cp-laura-mendez');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 'cotizar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 'consulta') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 1, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 2, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 3, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 4, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 5, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 6, '09:00', '20:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'C.P. Méndez' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and name = 'C.P. Méndez');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'cita', 'Videollamada de dudas', null, null, 350, 30, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and name = 'Videollamada de dudas');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'cotizacion', 'Plan freelancer mensual', 'Desde $590 al mes', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and name = 'Plan freelancer mensual');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'producto', 'Plan freelancer mensual', 'Declaración y facturación ilimitada', 'Paquetes', 590, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and name = 'Plan freelancer mensual');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'producto', 'Declaración anual', 'Persona física', 'Paquetes', 950, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and name = 'Declaración anual');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'Claudia R.', 5, 'Por fin entiendo mis impuestos. Responde rapidísimo.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and author_name = 'Claudia R.' and body = 'Por fin entiendo mis impuestos. Responde rapidísimo.');
+update public.businesses set rating_avg = 4.8, rating_count = 94, verified = true where slug = 'cp-laura-mendez';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Notaría Pública 14', 'notaria-publica-14', 'Notaría · escrituras y testamentos', 'Escrituras, testamentos, poderes y actas constitutivas. Cotización por escrito en 24 horas.',
+  (select id from public.categories where slug = 'notarias-y-tramites'),
+  (select id from public.zones where slug = 'centro-sur'),
+  '5214420000107', '5214420000107', 'Av. Universidad 280',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3342, 20.6031), 4326)::extensions.geography,
+  true, true, false, 'plata', 'activo', true, null,
+  'Notaría', array['Escrituras', 'Testamentos', 'Poderes notariales']::text[], 25, 'Lic. Andrade · Notario titular', null, array['Español']::text[], array['despacho']::text[], 0, 'Cotiza en 24 h', 'Casona amarilla frente a la Facultad de Derecho. Estacionamiento en la parte trasera.', false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'notaria-publica-14');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'notaria-publica-14'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'notaria-publica-14'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'notaria-publica-14'), 1, '09:00', '17:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'notaria-publica-14'), 2, '09:00', '17:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'notaria-publica-14'), 3, '09:00', '17:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'notaria-publica-14'), 4, '09:00', '17:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'notaria-publica-14'), 5, '09:00', '17:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'notaria-publica-14'), 6, '09:00', '17:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'notaria-publica-14'), 'Lic. Andrade' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and name = 'Lic. Andrade');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'notaria-publica-14'), 'cita', 'Asesoría notarial', null, null, 0, 30, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and name = 'Asesoría notarial');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'notaria-publica-14'), 'cotizacion', 'Escritura de compraventa', 'Según valor del inmueble', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and name = 'Escritura de compraventa');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'notaria-publica-14'), 'cotizacion', 'Testamento', null, null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and name = 'Testamento');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'notaria-publica-14'), 'Marta L.', 5, 'Todo listo en la fecha prometida. Excelente trato.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and author_name = 'Marta L.' and body = 'Todo listo en la fecha prometida. Excelente trato.');
+update public.businesses set rating_avg = 4.6, rating_count = 112, verified = true where slug = 'notaria-publica-14';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Traducciones Peritas Morales', 'traducciones-peritas-morales', 'Perito traductor · inglés y francés', 'Traducciones certificadas de actas, títulos, contratos y expedientes para juicios o trámites migratorios.',
+  (select id from public.categories where slug = 'notarias-y-tramites'),
+  (select id from public.zones where slug = 'centro-historico'),
+  '5214420000108', '5214420000108', 'Calle Hidalgo 77',
   extensions.st_setsrid(extensions.st_makepoint(-100.3312, 20.6058), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null
-where not exists (select 1 from public.businesses where slug = 'taller-mecanico-lopez');
+  true, true, false, 'plata', 'activo', true, null,
+  'Perito traductor', array['Traducción certificada']::text[], 11, 'Perito autorizado por el Tribunal Superior de Justicia', null, array['Español', 'Inglés', 'Francés']::text[], array['despacho', 'en_linea']::text[], null, 'Entrega en 48 h', null, false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'traducciones-peritas-morales');
 
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 'reservar') on conflict do nothing;
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 'cotizar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 0, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 1, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 2, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 3, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 4, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 5, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'taller-mecanico-lopez'), 6, '09:00', '19:00') on conflict do nothing;
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'taller-mecanico-lopez'), 'cita', 'Diagnóstico', null, null, 350, 60, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'taller-mecanico-lopez') and name = 'Diagnóstico');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'taller-mecanico-lopez'), 'cita', 'Afinación', null, null, 1200, 180, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'taller-mecanico-lopez') and name = 'Afinación');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'taller-mecanico-lopez'), 'cotizacion', 'Cambio de balatas', 'Según modelo del auto', null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'taller-mecanico-lopez') and name = 'Cambio de balatas');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'taller-mecanico-lopez'), 'Jorge V.', 5, 'Honestos, me mandaron fotos de las piezas.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'taller-mecanico-lopez') and author_name = 'Jorge V.' and body = 'Honestos, me mandaron fotos de las piezas.');
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'traducciones-peritas-morales'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'traducciones-peritas-morales'), 1, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'traducciones-peritas-morales'), 2, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'traducciones-peritas-morales'), 3, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'traducciones-peritas-morales'), 4, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'traducciones-peritas-morales'), 5, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'traducciones-peritas-morales'), 6, '09:00', '19:00') on conflict do nothing;
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'traducciones-peritas-morales'), 'cotizacion', 'Acta de nacimiento', 'Desde $450 · 48 h', null, null, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'traducciones-peritas-morales') and name = 'Acta de nacimiento');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'traducciones-peritas-morales'), 'cotizacion', 'Contrato o expediente', 'Precio por cuartilla', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'traducciones-peritas-morales') and name = 'Contrato o expediente');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'traducciones-peritas-morales'), 'producto', 'Acta de nacimiento', 'Inglés o francés · 48 h', 'Certificadas', 450, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'traducciones-peritas-morales') and name = 'Acta de nacimiento');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'traducciones-peritas-morales'), 'producto', 'Título profesional', null, 'Certificadas', 650, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'traducciones-peritas-morales') and name = 'Título profesional');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'traducciones-peritas-morales'), 'Lic. Mariana Ortiz', 5, 'Mi perito de confianza para juicios. Siempre a tiempo.', null, now() - interval '5 days' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'traducciones-peritas-morales') and author_name = 'Lic. Mariana Ortiz' and body = 'Mi perito de confianza para juicios. Siempre a tiempo.');
+update public.businesses set rating_avg = 4.9, rating_count = 49, verified = true where slug = 'traducciones-peritas-morales';
 
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Refaccionaria Ruiz', 'refaccionaria-ruiz', 'Refacciones', 'Refacciones para todas las marcas. Precio especial a talleres.',
-  (select id from public.categories where slug = 'autos-y-talleres'),
-  (select id from public.zones where slug = 'cumbres-de-conin'),
-  '5214420000109', '5214420000109', 'Av. Industrial 102',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3289, 20.6066), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, null
-where not exists (select 1 from public.businesses where slug = 'refaccionaria-ruiz');
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Psic. Andrea Vidal', 'psic-andrea-vidal', 'Psicóloga · adultos y parejas', 'Terapia individual y de pareja, presencial o en línea. Enfoque cognitivo conductual.',
+  (select id from public.categories where slug = 'psicologia-y-salud'),
+  (select id from public.zones where slug = 'juriquilla'),
+  '5214420000109', '5214420000109', 'Calle Jazmín 41, consultorio 2',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3355, 20.5995), 4326)::extensions.geography,
+  true, true, false, 'plata', 'activo', true, null,
+  'Psicóloga', array['Terapia individual', 'Terapia de pareja', 'Ansiedad y estrés']::text[], 10, 'Cédula 8031457', 'Maestría en Psicoterapia Cognitivo Conductual', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 700, 'Responde en menos de 4 h', 'Consultorio 2, planta baja. Timbre con el nombre "Vidal".', false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'psic-andrea-vidal');
 
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 'ordenar') on conflict do nothing;
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 'cotizar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 0, '09:00', '19:30') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 1, '09:00', '19:30') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 2, '09:00', '19:30') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 3, '09:00', '19:30') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 4, '09:00', '19:30') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 5, '09:00', '19:30') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'refaccionaria-ruiz'), 6, '09:00', '19:30') on conflict do nothing;
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'refaccionaria-ruiz'), 'producto', 'Balatas delanteras', 'Varias marcas', 'Frenos', 590, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'refaccionaria-ruiz') and name = 'Balatas delanteras');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'refaccionaria-ruiz'), 'producto', 'Bujías (juego de 4)', null, 'Afinación', 420, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'refaccionaria-ruiz') and name = 'Bujías (juego de 4)');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'refaccionaria-ruiz'), 'cotizacion', 'Otra pieza', 'Dinos marca, modelo y año', null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'refaccionaria-ruiz') and name = 'Otra pieza');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'refaccionaria-ruiz'), 'Taller López', 5, 'Responden rápido y con buen precio.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'refaccionaria-ruiz') and author_name = 'Taller López' and body = 'Responden rápido y con buen precio.');
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 'consulta') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 1, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 2, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 3, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 4, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 5, '09:00', '20:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 6, '09:00', '20:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'psic-andrea-vidal'), 'Psic. Vidal' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and name = 'Psic. Vidal');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'psic-andrea-vidal'), 'cita', 'Sesión individual', 'Presencial o en línea', null, 700, 50, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and name = 'Sesión individual');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'psic-andrea-vidal'), 'cita', 'Sesión de pareja', null, null, 950, 60, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and name = 'Sesión de pareja');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'psic-andrea-vidal'), null, 'Consultorio', '#F8E1EB', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and caption = 'Consultorio');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'psic-andrea-vidal'), 'Usuario verificado', 5, 'Me sentí escuchado desde la primera sesión.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and author_name = 'Usuario verificado' and body = 'Me sentí escuchado desde la primera sesión.');
+update public.businesses set rating_avg = 4.9, rating_count = 87, verified = true where slug = 'psic-andrea-vidal';
 
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Plomería Hernández', 'plomeria-hernandez', 'Plomería a domicilio', 'Fugas, instalaciones, calentadores y destapes. Servicio el mismo día.',
-  (select id from public.categories where slug = 'hogar-y-oficios'),
-  null,
-  '5214420000110', '5214420000110', 'Servicio a domicilio',
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Arq. Diego Fuentes', 'arq-diego-fuentes', 'Arquitecto · proyectos y licencias', 'Planos, remodelaciones, licencias de construcción y dirección de obra. La visita de levantamiento se descuenta del proyecto.',
+  (select id from public.categories where slug = 'arquitectura'),
+  (select id from public.zones where slug = 'el-marques'),
+  '5214420000110', '5214420000110', 'Av. Industrial 102',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3235, 20.6015), 4326)::extensions.geography,
+  false, true, true, 'plata', 'activo', true, null,
+  'Arquitecto', array['Proyecto arquitectónico', 'Licencias de construcción', 'Remodelación']::text[], 14, 'Cédula 5520981 · DRO registrado', 'Arquitectura, UAQ', array['Español']::text[], array['domicilio', 'despacho']::text[], 800, 'Responde en menos de 1 día', null, false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'arq-diego-fuentes');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 1, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 2, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 3, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 4, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 5, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 6, '09:00', '18:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'arq-diego-fuentes'), 'Arq. Fuentes' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and name = 'Arq. Fuentes');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'arq-diego-fuentes'), 'cita', 'Visita de levantamiento', null, null, 800, 90, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and name = 'Visita de levantamiento');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'arq-diego-fuentes'), 'cotizacion', 'Proyecto de remodelación', 'Planos y presupuesto de obra', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and name = 'Proyecto de remodelación');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'arq-diego-fuentes'), 'cotizacion', 'Licencia de construcción', null, null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and name = 'Licencia de construcción');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'arq-diego-fuentes'), null, 'Remodelación de cocina, Juriquilla', '#E2E7EF', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and caption = 'Remodelación de cocina, Juriquilla');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'arq-diego-fuentes'), null, 'Casa habitación, El Marqués', '#DCE4F2', 1 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and caption = 'Casa habitación, El Marqués');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'arq-diego-fuentes'), 'Jorge V.', 5, 'La licencia salió a la primera, gracias a sus planos.', null, now() - interval '3 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and author_name = 'Jorge V.' and body = 'La licencia salió a la primera, gracias a sus planos.');
+update public.businesses set rating_avg = 4.7, rating_count = 29, verified = true where slug = 'arq-diego-fuentes';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Patricia Luna', 'patricia-luna-seguros', 'Asesora de seguros · vida y gastos médicos', 'Comparo varias aseguradoras y te explico cada cobertura sin presiones. Revisión de pólizas sin costo.',
+  (select id from public.categories where slug = 'consultoria'),
+  (select id from public.zones where slug = 'queretaro-centro'),
+  '5214420000111', '5214420000111', 'Plaza Zen, local 15',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3281, 20.6005), 4326)::extensions.geography,
+  true, true, true, 'plata', 'activo', true, null,
+  'Asesora de seguros', array['Seguros de gastos médicos', 'Seguros de vida y retiro']::text[], 8, 'Cédula CNSF A-120394', null, array['Español']::text[], array['despacho', 'en_linea', 'domicilio']::text[], 0, 'Responde en menos de 1 h', null, false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'patricia-luna-seguros');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 'cotizar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 'consulta') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 1, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 2, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 3, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 4, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 5, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 6, '09:00', '19:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'patricia-luna-seguros'), 'Patricia Luna' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'patricia-luna-seguros') and name = 'Patricia Luna');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'patricia-luna-seguros'), 'cita', 'Revisión de pólizas', null, null, 0, 40, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'patricia-luna-seguros') and name = 'Revisión de pólizas');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'patricia-luna-seguros'), 'cotizacion', 'Gastos médicos mayores', 'Individual o familiar', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'patricia-luna-seguros') and name = 'Gastos médicos mayores');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'patricia-luna-seguros'), 'Laura M.', 5, 'Me explicó cada cobertura sin presiones.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'patricia-luna-seguros') and author_name = 'Laura M.' and body = 'Me explicó cada cobertura sin presiones.');
+update public.businesses set rating_avg = 4.8, rating_count = 53, verified = true where slug = 'patricia-luna-seguros';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Rumbo Consultores', 'rumbo-consultores', 'Consultoría · procesos y finanzas', 'Diagnóstico operativo, mejora de procesos, costos y tableros de indicadores para micro y pequeñas empresas.',
+  (select id from public.categories where slug = 'consultoria'),
+  (select id from public.zones where slug = 'centro-sur'),
+  '5214420000112', '5214420000112', 'Av. Constituyentes 812',
   extensions.st_setsrid(extensions.st_makepoint(-100.3245, 20.5992), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null
+  true, true, true, 'plata', 'activo', true, null,
+  'Consultoría para PyMEs', array['Mejora de procesos', 'Finanzas para PyME']::text[], 12, null, 'Ingeniería Industrial · Lean Six Sigma Black Belt', array['Español', 'Inglés']::text[], array['domicilio', 'en_linea']::text[], 0, 'Responde el mismo día', null, false, null, null, null
+where not exists (select 1 from public.businesses where slug = 'rumbo-consultores');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'rumbo-consultores'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'rumbo-consultores'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'rumbo-consultores'), 1, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'rumbo-consultores'), 2, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'rumbo-consultores'), 3, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'rumbo-consultores'), 4, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'rumbo-consultores'), 5, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'rumbo-consultores'), 6, '09:00', '19:00') on conflict do nothing;
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'rumbo-consultores'), 'cita', 'Diagnóstico express', '1 hora en tu negocio', null, 0, 60, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and name = 'Diagnóstico express');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'rumbo-consultores'), 'cotizacion', 'Proyecto de mejora de procesos', '4 a 8 semanas', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and name = 'Proyecto de mejora de procesos');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'rumbo-consultores'), 'Ana G.', 5, 'Bajamos 15% los costos del taller en dos meses.', null, now() - interval '1 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and author_name = 'Ana G.' and body = 'Bajamos 15% los costos del taller en dos meses.');
+update public.businesses set rating_avg = 4.9, rating_count = 38, verified = true where slug = 'rumbo-consultores';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Plomería Hernández', 'plomeria-hernandez', 'Plomero · servicio el mismo día', 'Fugas, instalaciones, calentadores y destapes. La visita de diagnóstico se descuenta si hacemos el trabajo.',
+  (select id from public.categories where slug = 'plomeria'),
+  (select id from public.zones where slug = 'queretaro'),
+  '5214420000113', '5214420000113', 'Servicio a domicilio',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3272, 20.5998), 4326)::extensions.geography,
+  true, true, true, 'plata', 'activo', true, null,
+  'Plomero', array['Fugas de agua', 'Calentadores', 'Destapes y drenaje', 'Tinacos y cisternas']::text[], 20, 'Certificación CONOCER en instalaciones hidráulicas', null, array['Español']::text[], array['domicilio']::text[], 250, 'Llega el mismo día', 'Atiende en todo Querétaro. Taller en Calle Bambú 12, junto a la tienda Don Beto.', true, 'Garantía de 3 meses por escrito', null, null
 where not exists (select 1 from public.businesses where slug = 'plomeria-hernandez');
 
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 'reservar') on conflict do nothing;
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 'cotizar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 0, '09:00', '20:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 1, '09:00', '20:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 2, '09:00', '20:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 3, '09:00', '20:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 4, '09:00', '20:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 5, '09:00', '20:00') on conflict do nothing;
 insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 6, '09:00', '20:00') on conflict do nothing;
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'cotizacion', 'Reparar fuga', 'Visita y diagnóstico', null, null, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and name = 'Reparar fuga');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'cotizacion', 'Instalar calentador', null, null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and name = 'Instalar calentador');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'Sofía N.', 5, 'Llegó en una hora y dejó todo limpio.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and author_name = 'Sofía N.' and body = 'Llegó en una hora y dejó todo limpio.');
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'Don Rafael' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and name = 'Don Rafael');
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'Iván' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and name = 'Iván');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'cita', 'Visita de diagnóstico', null, null, 250, 60, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and name = 'Visita de diagnóstico');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'cotizacion', 'Reparar fuga', null, null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and name = 'Reparar fuga');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'cotizacion', 'Instalar calentador', 'De paso o de depósito', null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and name = 'Instalar calentador');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'plomeria-hernandez'), null, 'Cambio de calentador de paso', '#DFEBFD', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and caption = 'Cambio de calentador de paso');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'plomeria-hernandez'), null, 'Reparación de fuga en muro (antes y después)', '#E1E8F4', 1 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and caption = 'Reparación de fuga en muro (antes y después)');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'plomeria-hernandez'), null, 'Instalación de tinaco de 1,100 L', '#DCE4F2', 2 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and caption = 'Instalación de tinaco de 1,100 L');
+insert into public.loyalty_programs (business_id, kind, goal, percent, reward) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'sellos', 4, null, 'Cuarta visita sin costo de diagnóstico' where not exists (select 1 from public.loyalty_programs where business_id = (select id from public.businesses where slug = 'plomeria-hernandez'));
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'Sofía N.', 5, 'Llegó en una hora, encontró la fuga y dejó todo limpio.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and author_name = 'Sofía N.' and body = 'Llegó en una hora, encontró la fuga y dejó todo limpio.');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'Pedro S.', 5, 'Precio justo y explicó qué falló.', null, now() - interval '1 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and author_name = 'Pedro S.' and body = 'Precio justo y explicó qué falló.');
+update public.businesses set rating_avg = 4.8, rating_count = 156, verified = true where slug = 'plomeria-hernandez';
 
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Papelería El Lápiz', 'papeleria-el-lapiz', 'Papelería · impresiones', 'Útiles escolares, copias, impresiones y regalos.',
-  (select id from public.categories where slug = 'tiendas'),
-  (select id from public.zones where slug = 'zen-house'),
-  '5214420000111', '5214420000111', 'Calle Zen 5',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3281, 20.6005), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', false, null
-where not exists (select 1 from public.businesses where slug = 'papeleria-el-lapiz');
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Eléctrica Ramírez', 'electrica-ramirez', 'Electricista · urgencias y paneles solares', 'Cortos, instalaciones nuevas, contactos y paneles solares con trámite ante CFE.',
+  (select id from public.categories where slug = 'electricidad'),
+  (select id from public.zones where slug = 'queretaro'),
+  '5214420000114', '5214420000114', 'Servicio a domicilio',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3298, 20.6045), 4326)::extensions.geography,
+  true, true, true, 'plata', 'activo', true, null,
+  'Electricista', array['Cortos y fallas', 'Instalaciones eléctricas', 'Paneles solares']::text[], 16, 'Técnico electricista certificado por CFE', null, array['Español']::text[], array['domicilio']::text[], 300, 'Urgencias en 2 h', null, true, 'Garantía de 6 meses en instalaciones', null, null
+where not exists (select 1 from public.businesses where slug = 'electrica-ramirez');
 
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'papeleria-el-lapiz'), 'ordenar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'papeleria-el-lapiz'), 0, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'papeleria-el-lapiz'), 1, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'papeleria-el-lapiz'), 2, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'papeleria-el-lapiz'), 3, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'papeleria-el-lapiz'), 4, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'papeleria-el-lapiz'), 5, '09:00', '20:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'papeleria-el-lapiz'), 6, '09:00', '20:00') on conflict do nothing;
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'papeleria-el-lapiz'), 'producto', 'Impresión a color', 'Por hoja', null, 8, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'papeleria-el-lapiz') and name = 'Impresión a color');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'papeleria-el-lapiz'), 'producto', 'Cuaderno profesional', null, null, 45, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'papeleria-el-lapiz') and name = 'Cuaderno profesional');
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'electrica-ramirez'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'electrica-ramirez'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'electrica-ramirez'), 1, '09:00', '21:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'electrica-ramirez'), 2, '09:00', '21:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'electrica-ramirez'), 3, '09:00', '21:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'electrica-ramirez'), 4, '09:00', '21:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'electrica-ramirez'), 5, '09:00', '21:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'electrica-ramirez'), 6, '09:00', '21:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'electrica-ramirez'), 'Juan Ramírez' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and name = 'Juan Ramírez');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'electrica-ramirez'), 'cita', 'Visita por falla eléctrica', null, null, 300, 60, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and name = 'Visita por falla eléctrica');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'electrica-ramirez'), 'cotizacion', 'Sistema de paneles solares', 'Incluye trámite CFE', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and name = 'Sistema de paneles solares');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'electrica-ramirez'), null, 'Sistema de 6 paneles solares', '#FBF0D9', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and caption = 'Sistema de 6 paneles solares');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'electrica-ramirez'), null, 'Tablero eléctrico nuevo', '#E2E7EF', 1 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and caption = 'Tablero eléctrico nuevo');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'electrica-ramirez'), 'Laura M.', 5, 'Resolvió un corto que otros no encontraron.', null, now() - interval '6 days' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and author_name = 'Laura M.' and body = 'Resolvió un corto que otros no encontraron.');
+update public.businesses set rating_avg = 4.9, rating_count = 88, verified = true where slug = 'electrica-ramirez';
 
-insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo)
-select 'Repostería Dulce Bruma', 'reposteria-dulce-bruma', 'Pasteles por encargo', 'Pasteles, cupcakes y mesas de postres por encargo.',
-  (select id from public.categories where slug = 'cafe-y-postres'),
-  (select id from public.zones where slug = 'el-mirador'),
-  '5214420000112', '5214420000112', 'Calle Jazmín 41',
-  extensions.st_setsrid(extensions.st_makepoint(-100.3302, 20.5979), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, null
-where not exists (select 1 from public.businesses where slug = 'reposteria-dulce-bruma');
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Carpintería Don Chuy', 'carpinteria-don-chuy', 'Carpintero · cocinas y closets', 'Cocinas integrales, closets y muebles a medida en madera y MDF. Medición sin costo.',
+  (select id from public.categories where slug = 'carpinteria'),
+  (select id from public.zones where slug = 'el-marques'),
+  '5214420000115', '5214420000115', 'Calle Bambú 33 (taller)',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3289, 20.6066), 4326)::extensions.geography,
+  true, true, true, 'plata', 'activo', false, null,
+  'Carpintero', array['Muebles a medida', 'Closets y cocinas', 'Reparación de muebles']::text[], 30, null, null, array['Español']::text[], array['domicilio', 'despacho']::text[], 0, 'Responde en menos de 1 día', 'Taller con portón verde, a un lado de la papelería.', false, 'Garantía de 1 año en herrajes', null, null
+where not exists (select 1 from public.businesses where slug = 'carpinteria-don-chuy');
 
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 'ordenar') on conflict do nothing;
-insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 'cotizar') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 0, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 1, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 2, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 3, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 4, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 5, '09:00', '19:00') on conflict do nothing;
-insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'reposteria-dulce-bruma'), 6, '09:00', '19:00') on conflict do nothing;
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'reposteria-dulce-bruma'), 'producto', 'Rebanada de pastel', null, 'Del día', 65, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'reposteria-dulce-bruma') and name = 'Rebanada de pastel');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'reposteria-dulce-bruma'), 'producto', 'Caja de 6 cupcakes', null, 'Del día', 180, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'reposteria-dulce-bruma') and name = 'Caja de 6 cupcakes');
-insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'reposteria-dulce-bruma'), 'cotizacion', 'Pastel personalizado', 'Dinos tema y número de personas', 'Encargos', null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'reposteria-dulce-bruma') and name = 'Pastel personalizado');
-insert into public.reviews (business_id, author_name, rating, body, reply) select (select id from public.businesses where slug = 'reposteria-dulce-bruma'), 'Laura M.', 5, 'El pastel de cumpleaños quedó idéntico a la foto.', null where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'reposteria-dulce-bruma') and author_name = 'Laura M.' and body = 'El pastel de cumpleaños quedó idéntico a la foto.');
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 1, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 2, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 3, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 4, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 5, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 6, '09:00', '18:00') on conflict do nothing;
+insert into public.staff (business_id, name) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), 'Don Chuy' where not exists (select 1 from public.staff where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and name = 'Don Chuy');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), 'cita', 'Medición a domicilio', null, null, 0, 45, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and name = 'Medición a domicilio');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), 'cotizacion', 'Cocina integral', null, null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and name = 'Cocina integral');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), 'cotizacion', 'Closet a medida', null, null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and name = 'Closet a medida');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), null, 'Cocina integral en roble', '#F1E4D6', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and caption = 'Cocina integral en roble');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), null, 'Closet de piso a techo', '#EADBC8', 1 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and caption = 'Closet de piso a techo');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), null, 'Librero empotrado', '#F3E9DC', 2 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and caption = 'Librero empotrado');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), 'Marta L.', 5, 'La cocina quedó idéntica al diseño y a tiempo.', null, now() - interval '1 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and author_name = 'Marta L.' and body = 'La cocina quedó idéntica al diseño y a tiempo.');
+update public.businesses set rating_avg = 4.7, rating_count = 61, verified = false where slug = 'carpinteria-don-chuy';
 
--- Anuncios al abrir la app (activos durante 30 días)
-insert into public.opening_ads (business_id, headline, body, cta, color, status) select (select id from public.businesses where slug = 'cafe-la-esquina'), '2x1 en waffles', 'Hoy de 4 a 6 pm. Enseña la app en caja.', 'Ver menú', '#E04A1F', 'activa' where not exists (select 1 from public.opening_ads where business_id = (select id from public.businesses where slug = 'cafe-la-esquina') and headline = '2x1 en waffles');
-insert into public.opening_ads (business_id, headline, body, cta, color, status) select (select id from public.businesses where slug = 'estetica-bella-luna'), '30% en tu primera visita', 'Corte, tinte o uñas. Agenda desde aquí.', 'Reservar', '#E8457C', 'activa' where not exists (select 1 from public.opening_ads where business_id = (select id from public.businesses where slug = 'estetica-bella-luna') and headline = '30% en tu primera visita');
-insert into public.opening_ads (business_id, headline, body, cta, color, status) select (select id from public.businesses where slug = 'reposteria-dulce-bruma'), 'Pasteles por encargo', 'Pide hoy y recógelo mañana en Zen House.', 'Ver pasteles', '#7B4FE0', 'activa' where not exists (select 1 from public.opening_ads where business_id = (select id from public.businesses where slug = 'reposteria-dulce-bruma') and headline = 'Pasteles por encargo');
-insert into public.opening_ads (business_id, headline, body, cta, color, status) select (select id from public.businesses where slug = 'fonda-dona-lupe'), 'Postre gratis', 'En pedidos desde $250 a domicilio.', 'Pedir comida', '#12A06E', 'activa' where not exists (select 1 from public.opening_ads where business_id = (select id from public.businesses where slug = 'fonda-dona-lupe') and headline = 'Postre gratis');
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Climas del Bajío', 'climas-del-bajio', 'Técnico · minisplits y refrigeradores', 'Instalación, mantenimiento y reparación de minisplits, refrigeradores y lavadoras de todas las marcas.',
+  (select id from public.categories where slug = 'climas'),
+  (select id from public.zones where slug = 'queretaro'),
+  '5214420000116', '5214420000116', 'Servicio a domicilio',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3268, 20.5975), 4326)::extensions.geography,
+  true, true, true, 'plata', 'activo', true, null,
+  'Técnico en refrigeración', array['Minisplits', 'Refrigeradores', 'Lavadoras y secadoras']::text[], 9, 'Certificación en refrigeración y aire acondicionado', null, array['Español']::text[], array['domicilio']::text[], 350, 'Responde en menos de 2 h', null, false, 'Garantía de 3 meses en reparaciones', null, null
+where not exists (select 1 from public.businesses where slug = 'climas-del-bajio');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'climas-del-bajio'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'climas-del-bajio'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'climas-del-bajio'), 1, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'climas-del-bajio'), 2, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'climas-del-bajio'), 3, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'climas-del-bajio'), 4, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'climas-del-bajio'), 5, '09:00', '19:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'climas-del-bajio'), 6, '09:00', '19:00') on conflict do nothing;
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'climas-del-bajio'), 'cita', 'Mantenimiento de minisplit', null, null, 650, 90, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'climas-del-bajio') and name = 'Mantenimiento de minisplit');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'climas-del-bajio'), 'cita', 'Diagnóstico de refrigerador', null, null, 350, 60, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'climas-del-bajio') and name = 'Diagnóstico de refrigerador');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'climas-del-bajio'), 'producto', 'Mantenimiento de 2 minisplits', 'Limpieza profunda y revisión de gas', 'Paquetes', 1100, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'climas-del-bajio') and name = 'Mantenimiento de 2 minisplits');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'climas-del-bajio'), 'Rodrigo M.', 4, 'Buen servicio, llegó media hora tarde pero avisó.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'climas-del-bajio') and author_name = 'Rodrigo M.' and body = 'Buen servicio, llegó media hora tarde pero avisó.');
+update public.businesses set rating_avg = 4.6, rating_count = 42, verified = true where slug = 'climas-del-bajio';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Acabados Mendoza', 'acabados-mendoza', 'Pintura e impermeabilización', 'Pintura interior y exterior, impermeabilización con garantía por escrito y trabajos de albañilería.',
+  (select id from public.categories where slug = 'pintura-y-albanileria'),
+  (select id from public.zones where slug = 'queretaro'),
+  '5214420000117', '5214420000117', 'Servicio a domicilio',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3225, 20.6028), 4326)::extensions.geography,
+  true, true, true, 'plata', 'activo', false, null,
+  'Maestro de obra', array['Pintura', 'Impermeabilización', 'Albañilería']::text[], 22, null, null, array['Español']::text[], array['domicilio']::text[], 0, 'Cotiza en 24 h', null, false, 'Garantía de 5 años en impermeabilización', null, null
+where not exists (select 1 from public.businesses where slug = 'acabados-mendoza');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'acabados-mendoza'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'acabados-mendoza'), 1, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'acabados-mendoza'), 2, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'acabados-mendoza'), 3, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'acabados-mendoza'), 4, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'acabados-mendoza'), 5, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'acabados-mendoza'), 6, '09:00', '18:00') on conflict do nothing;
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'acabados-mendoza'), 'cotizacion', 'Impermeabilización', 'Precio por m²', null, null, null, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'acabados-mendoza') and name = 'Impermeabilización');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'acabados-mendoza'), 'cotizacion', 'Pintura de casa', null, null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'acabados-mendoza') and name = 'Pintura de casa');
+insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'acabados-mendoza'), null, 'Azotea impermeabilizada, 120 m²', '#DDF1EA', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'acabados-mendoza') and caption = 'Azotea impermeabilizada, 120 m²');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'acabados-mendoza'), 'Jorge V.', 5, 'Ya pasó la temporada de lluvias y cero goteras.', null, now() - interval '2 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'acabados-mendoza') and author_name = 'Jorge V.' and body = 'Ya pasó la temporada de lluvias y cero goteras.');
+update public.businesses set rating_avg = 4.5, rating_count = 37, verified = false where slug = 'acabados-mendoza';
+
+insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+select 'Cerrajería Llave Maestra', 'cerrajeria-llave-maestra', 'Cerrajero · 24 horas', 'Aperturas sin daño, cambio de chapas y duplicado de llaves de auto con chip. Servicio 24 horas.',
+  (select id from public.categories where slug = 'cerrajeria'),
+  (select id from public.zones where slug = 'queretaro'),
+  '5214420000118', '5214420000118', 'Av. 5 de Febrero 1500',
+  extensions.st_setsrid(extensions.st_makepoint(-100.3338, 20.6052), 4326)::extensions.geography,
+  true, true, true, 'plata', 'activo', true, null,
+  'Cerrajero', array['Aperturas', 'Cambio de chapas', 'Llaves de auto']::text[], 13, null, null, array['Español']::text[], array['domicilio', 'despacho']::text[], 350, 'Llega en 40 min', 'Local con letrero amarillo, esquina con Av. Universidad.', true, 'Garantía de 1 año en chapas', null, null
+where not exists (select 1 from public.businesses where slug = 'cerrajeria-llave-maestra');
+
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 'reservar') on conflict do nothing;
+insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 'cotizar') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 1, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 2, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 3, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 4, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 5, '09:00', '18:00') on conflict do nothing;
+insert into public.business_hours (business_id, weekday, opens, closes) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 6, '09:00', '18:00') on conflict do nothing;
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 'cita', 'Apertura de puerta', null, null, 350, 30, true, 0 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cerrajeria-llave-maestra') and name = 'Apertura de puerta');
+insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 'cotizacion', 'Llave de auto con chip', 'Dinos marca y modelo', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cerrajeria-llave-maestra') and name = 'Llave de auto con chip');
+insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 'Lucía P.', 5, 'Llegó en media hora un domingo en la noche.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'cerrajeria-llave-maestra') and author_name = 'Lucía P.' and body = 'Llegó en media hora un domingo en la noche.');
+update public.businesses set rating_avg = 4.7, rating_count = 71, verified = true where slug = 'cerrajeria-llave-maestra';
+
+-- Muro de la comunidad
+insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'servicio', 'Declaración anual de personas físicas', 'Revisamos tus deducciones (médicos, colegiaturas, intereses) para que recuperes tu saldo a favor. Trae tu e.firma o te ayudamos a tramitarla.', 'Declaración anual', 1200, 'precio fijo', 34, now() - interval '2 hours' where not exists (select 1 from public.posts where title = 'Declaración anual de personas físicas');
+insert into public.post_comments (post_id, author_name, body) select (select id from public.posts where title = 'Declaración anual de personas físicas'), 'Lucía P.', '¿Incluye si tengo dos patrones?' where not exists (select 1 from public.post_comments pc join public.posts po on po.id = pc.post_id where po.title = 'Declaración anual de personas físicas' and pc.body = '¿Incluye si tengo dos patrones?');
+insert into public.post_comments (post_id, author_name, body) select (select id from public.posts where title = 'Declaración anual de personas físicas'), 'Despacho Contable Reyes', 'Sí, Lucía, mismo precio.' where not exists (select 1 from public.post_comments pc join public.posts po on po.id = pc.post_id where po.title = 'Declaración anual de personas físicas' and pc.body = 'Sí, Lucía, mismo precio.');
+insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'consejo', '¿Tu recibo de agua subió sin razón?', 'Cierra todas las llaves y revisa el medidor 30 minutos. Si se mueve, tienes una fuga oculta. Te ayudo a encontrarla sin romper de más.', 'Fugas de agua', null, null, 58, now() - interval '5 hours' where not exists (select 1 from public.posts where title = '¿Tu recibo de agua subió sin razón?');
+insert into public.post_comments (post_id, author_name, body) select (select id from public.posts where title = '¿Tu recibo de agua subió sin razón?'), 'Pedro S.', 'Me pasó justo esto, gracias por el tip.' where not exists (select 1 from public.post_comments pc join public.posts po on po.id = pc.post_id where po.title = '¿Tu recibo de agua subió sin razón?' and pc.body = 'Me pasó justo esto, gracias por el tip.');
+insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'servicio', 'Divorcio voluntario con convenio', 'Si ambos están de acuerdo, el trámite puede quedar en 6 a 10 semanas. Primera consulta en línea a $350 para revisar tu caso.', 'Familiar', 350, 'primera consulta', 21, now() - interval '1 day' where not exists (select 1 from public.posts where title = 'Divorcio voluntario con convenio');
+insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'rumbo-consultores'), 'evento', 'Taller gratuito: precios que sí dejan utilidad', 'Sábado 8 de noviembre, 10:00 h, en línea. Para dueños de negocio que quieren calcular bien sus costos. Cupo de 30 lugares.', 'Finanzas para PyME', null, null, 47, now() - interval '1 day' where not exists (select 1 from public.posts where title = 'Taller gratuito: precios que sí dejan utilidad');
+insert into public.post_comments (post_id, author_name, body) select (select id from public.posts where title = 'Taller gratuito: precios que sí dejan utilidad'), 'Ana G.', 'Ya me registré 🙌' where not exists (select 1 from public.post_comments pc join public.posts po on po.id = pc.post_id where po.title = 'Taller gratuito: precios que sí dejan utilidad' and pc.body = 'Ya me registré 🙌');
+insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'electrica-ramirez'), 'servicio', 'Paneles solares con trámite CFE incluido', 'Si tu recibo bimestral pasa de $2,000, un sistema de 6 paneles se paga en unos 3 años. Visita y cálculo sin costo este mes.', 'Paneles solares', null, 'cotización sin costo', 39, now() - interval '2 days' where not exists (select 1 from public.posts where title = 'Paneles solares con trámite CFE incluido');
+insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'consejo', 'Te despidieron: no firmes nada todavía', 'Tienes 2 meses para reclamar. Antes de firmar tu finiquito, revisa que incluya aguinaldo, vacaciones y prima vacacional proporcionales.', 'Laboral', null, null, 112, now() - interval '3 days' where not exists (select 1 from public.posts where title = 'Te despidieron: no firmes nada todavía');
+insert into public.post_comments (post_id, author_name, body) select (select id from public.posts where title = 'Te despidieron: no firmes nada todavía'), 'Jorge V.', 'Este consejo me salvó.' where not exists (select 1 from public.post_comments pc join public.posts po on po.id = pc.post_id where po.title = 'Te despidieron: no firmes nada todavía' and pc.body = 'Este consejo me salvó.');
+insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'acabados-mendoza'), 'servicio', 'Impermeabiliza antes de las lluvias', 'Sistema acrílico de 5 años con garantía por escrito. Revisión de techo sin costo.', 'Impermeabilización', 95, 'por m²', 18, now() - interval '4 days' where not exists (select 1 from public.posts where title = 'Impermeabiliza antes de las lluvias');
+insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'psic-andrea-vidal'), 'consejo', 'Respiración 4-7-8 para bajar la ansiedad', 'Inhala en 4 segundos, sostén 7 y exhala en 8. Repite cuatro veces. Si la ansiedad no cede en semanas, vale la pena pedir ayuda.', 'Ansiedad y estrés', null, null, 76, now() - interval '5 days' where not exists (select 1 from public.posts where title = 'Respiración 4-7-8 para bajar la ansiedad');
+
+-- Preguntas a expertos con sus respuestas
+insert into public.questions (category_id, author_name, specialty, body, created_at) select (select id from public.categories where slug = 'abogados'), 'Laura M.', 'Laboral', 'Me ofrecen firmar mi renuncia a cambio de un mes de sueldo. ¿Me conviene o me corresponde más?', now() - interval '3 hours' where not exists (select 1 from public.questions where body = 'Me ofrecen firmar mi renuncia a cambio de un mes de sueldo. ¿Me conviene o me corresponde más?');
+insert into public.answers (question_id, business_id, body, helpful_count) select (select id from public.questions where body = 'Me ofrecen firmar mi renuncia a cambio de un mes de sueldo. ¿Me conviene o me corresponde más?'), (select id from public.businesses where slug = 'lic-roberto-campos'), 'Si te están pidiendo renunciar, en realidad es un despido. Te corresponden 3 meses de salario, 20 días por año en algunos casos, más aguinaldo, vacaciones y prima proporcionales. No firmes sin revisar los números.', 24 where not exists (select 1 from public.answers where body = 'Si te están pidiendo renunciar, en realidad es un despido. Te corresponden 3 meses de salario, 20 días por año en algunos casos, más aguinaldo, vacaciones y prima proporcionales. No firmes sin revisar los números.');
+insert into public.questions (category_id, author_name, specialty, body, created_at) select (select id from public.categories where slug = 'contadores'), 'Pedro S.', 'Declaración anual', '¿Tengo que presentar declaración anual si solo tuve un trabajo de sueldo?', now() - interval '1 day' where not exists (select 1 from public.questions where body = '¿Tengo que presentar declaración anual si solo tuve un trabajo de sueldo?');
+insert into public.answers (question_id, business_id, body, helpful_count) select (select id from public.questions where body = '¿Tengo que presentar declaración anual si solo tuve un trabajo de sueldo?'), (select id from public.businesses where slug = 'despacho-contable-reyes'), 'Si ganaste menos de 400 mil pesos y solo de un patrón, no es obligatoria. Pero si tuviste gastos médicos o colegiaturas, conviene presentarla para recuperar saldo a favor.', 31 where not exists (select 1 from public.answers where body = 'Si ganaste menos de 400 mil pesos y solo de un patrón, no es obligatoria. Pero si tuviste gastos médicos o colegiaturas, conviene presentarla para recuperar saldo a favor.');
+insert into public.answers (question_id, business_id, body, helpful_count) select (select id from public.questions where body = '¿Tengo que presentar declaración anual si solo tuve un trabajo de sueldo?'), (select id from public.businesses where slug = 'cp-laura-mendez'), 'Coincido. Revisa también si tu patrón te hizo el ajuste anual; si no, podrías tener saldo a favor.', 9 where not exists (select 1 from public.answers where body = 'Coincido. Revisa también si tu patrón te hizo el ajuste anual; si no, podrías tener saldo a favor.');
+insert into public.questions (category_id, author_name, specialty, body, created_at) select (select id from public.categories where slug = 'plomeria'), 'Sofía N.', 'Calentadores', 'Mi calentador de paso enciende y se apaga solo. ¿Es peligroso?', now() - interval '2 days' where not exists (select 1 from public.questions where body = 'Mi calentador de paso enciende y se apaga solo. ¿Es peligroso?');
+insert into public.answers (question_id, business_id, body, helpful_count) select (select id from public.questions where body = 'Mi calentador de paso enciende y se apaga solo. ¿Es peligroso?'), (select id from public.businesses where slug = 'plomeria-hernandez'), 'Puede ser poca presión de agua o el sensor de flama sucio. No es peligroso si no huele a gas; si huele, cierra la llave y ventila. Es una reparación sencilla.', 15 where not exists (select 1 from public.answers where body = 'Puede ser poca presión de agua o el sensor de flama sucio. No es peligroso si no huele a gas; si huele, cierra la llave y ventila. Es una reparación sencilla.');
+insert into public.questions (category_id, author_name, specialty, body, created_at) select (select id from public.categories where slug = 'arquitectura'), 'Usuario 3381', null, '¿Necesito licencia para construir un segundo piso en mi casa?', now() - interval '4 days' where not exists (select 1 from public.questions where body = '¿Necesito licencia para construir un segundo piso en mi casa?');
+
+-- Anuncios al abrir la app
+insert into public.opening_ads (business_id, headline, body, cta, color, status) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'Asesoría fiscal gratis', 'Tu primera consulta sin costo, en despacho o en línea.', 'Agendar cita', '#1F3A68', 'activa' where not exists (select 1 from public.opening_ads where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and headline = 'Asesoría fiscal gratis');
+insert into public.opening_ads (business_id, headline, body, cta, color, status) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), '10% en tu consulta', 'Derecho familiar con cédula verificada. Agenda desde aquí.', 'Agendar cita', '#6B4FC8', 'activa' where not exists (select 1 from public.opening_ads where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and headline = '10% en tu consulta');
+insert into public.opening_ads (business_id, headline, body, cta, color, status) select (select id from public.businesses where slug = 'notaria-publica-14'), 'Mes del testamento', 'Precio preferente todo septiembre. Cotiza en 24 h.', 'Cotizar', '#146B4F', 'activa' where not exists (select 1 from public.opening_ads where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and headline = 'Mes del testamento');
+insert into public.opening_ads (business_id, headline, body, cta, color, status) select (select id from public.businesses where slug = 'patricia-luna-seguros'), 'Revisa tus pólizas', 'Te digo en 40 minutos si estás bien protegido.', 'Agendar cita', '#2F80ED', 'activa' where not exists (select 1 from public.opening_ads where business_id = (select id from public.businesses where slug = 'patricia-luna-seguros') and headline = 'Revisa tus pólizas');
 

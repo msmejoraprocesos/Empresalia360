@@ -7,6 +7,7 @@ import { Brand, Radius } from '@/constants/theme';
 import { getBusiness } from '@/data';
 import { money, shortDay } from '@/lib/format';
 import { track, useBusinessScreen } from '@/lib/analytics';
+import { useLoginGate } from '@/lib/auth';
 import { useApp } from '@/store/app';
 
 const SLOTS = ['09:00', '10:30', '12:00', '13:30', '16:00', '17:30', '18:40', '19:30'];
@@ -15,6 +16,7 @@ export default function Reservar() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
   const { actions } = useApp();
+  const gate = useLoginGate();
   const b = getBusiness(slug);
   const services = b?.items.filter((i) => i.kind === 'cita') ?? [];
   const [itemId, setItemId] = useState(services[0]?.id);
@@ -136,11 +138,11 @@ export default function Reservar() {
         <Button
           label={`Confirmar · ${label}`}
           disabled={busy.has(slot)}
-          onPress={() => {
+          onPress={() => gate(() => {
             track(b, 'seleccion', { itemId: item.id });
             actions.bookAppointment({ business: b, item, staff, label, total });
             setDone(true);
-          }}
+          })}
         />
       </BottomBar>
     </View>

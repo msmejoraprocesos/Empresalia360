@@ -1,0 +1,19 @@
+{
+  "name": "Expertalia 360",
+  "short_name": "Expertalia",
+  "description": "Encuentra abogados, contadores, plomeros, electricistas y más cerca de ti.",
+  "lang": "es-MX",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F6FA",
+  "theme_color": "#1F3A68",
+  "categories": ["business", "lifestyle", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

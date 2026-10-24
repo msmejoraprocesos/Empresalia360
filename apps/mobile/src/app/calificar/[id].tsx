@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BottomBar, Button, Card, Chip, EmptyState, Field, Header, StarInput } from '@/components/ui';
 import { Brand } from '@/constants/theme';
+import { useLoginGate } from '@/lib/auth';
 import { useApp } from '@/store/app';
 
 const TAGS = ['Atención', 'Claridad', 'Precio', 'Resultado', 'Puntualidad'];
@@ -12,6 +13,7 @@ export default function Calificar() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { state, actions } = useApp();
+  const gate = useLoginGate();
   const order = state.orders.find((o) => o.id === id);
   const [rating, setRating] = useState(5);
   const [body, setBody] = useState('');
@@ -48,11 +50,11 @@ export default function Calificar() {
       <BottomBar>
         <Button
           label="Publicar y ganar 50 puntos"
-          onPress={() => {
+          onPress={() => gate(() => {
             const text = [tags.join(', '), body.trim()].filter(Boolean).join('. ') || 'Buena experiencia.';
             actions.addReview(order.businessSlug, rating, text, order.id);
             router.back();
-          }}
+          })}
         />
       </BottomBar>
     </View>

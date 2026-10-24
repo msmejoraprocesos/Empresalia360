@@ -6,6 +6,7 @@ import { PostCard } from '@/components/community-feed';
 import { BottomBar, Button, Field, Header } from '@/components/ui';
 import { Brand, Radius } from '@/constants/theme';
 import type { Post } from '@/data/types';
+import { useLoginGate } from '@/lib/auth';
 import { myBusiness, useApp } from '@/store/app';
 
 const KINDS: { v: Post['kind']; label: string; hint: string }[] = [
@@ -17,6 +18,7 @@ const KINDS: { v: Post['kind']; label: string; hint: string }[] = [
 export default function Publicar() {
   const router = useRouter();
   const { actions } = useApp();
+  const gate = useLoginGate();
   const [kind, setKind] = useState<Post['kind']>('servicio');
   const [specialty, setSpecialty] = useState<string | undefined>(myBusiness.specialties[0]);
   const [title, setTitle] = useState('');
@@ -88,10 +90,10 @@ export default function Publicar() {
           label="Publicar"
           icon="megaphone-outline"
           disabled={!valid}
-          onPress={() => {
+          onPress={() => gate(() => {
             actions.publishPost({ kind, specialty, title: title.trim(), body: body.trim(), price: draft.price, priceNote: draft.priceNote });
             router.replace('/panel/comunidad');
-          }}
+          })}
         />
       </BottomBar>
     </View>

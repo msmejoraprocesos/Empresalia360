@@ -9,6 +9,8 @@ import { BottomBar, Button, Card, Field, Header } from '@/components/ui';
 import { Brand, Radius } from '@/constants/theme';
 import { ATTEND_ICON, ATTEND_LABEL, CATEGORIES, categoryBySlug } from '@/data';
 import type { Attend, Business, GalleryItem } from '@/data/types';
+import { Emoji } from '@/components/emoji';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { myBusiness, useApp } from '@/store/app';
 
 const LANGS = ['Español', 'Inglés', 'Francés', 'Alemán', 'Lengua de señas'];
@@ -41,8 +43,33 @@ function Section({ step, title, hint, children }: { step: number; title: string;
 
 export default function EditarPerfil() {
   const router = useRouter();
+  const { state } = useApp();
+  // Con Supabase se necesita cuenta para que el perfil quede guardado y sea de quien lo crea
+  if (isSupabaseConfigured && !state.account) {
+    return (
+      <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
+        <Header title="Mi perfil profesional" />
+        <View style={{ padding: 20, gap: 14 }}>
+          <Card style={{ alignItems: 'center', gap: 10 }}>
+            <Emoji name="trabajador" size={64} />
+            <Text style={[styles.h, { textAlign: 'center' }]}>Primero entra con tu correo</Text>
+            <Text style={[styles.hint, { textAlign: 'center' }]}>Así tu perfil queda guardado a tu nombre y solo tú lo puedes cambiar.</Text>
+          </Card>
+          <Button label="Entrar con mi correo" icon="mail-outline" onPress={() => router.push('/entrar')} />
+        </View>
+      </View>
+    );
+  }
+  // Se vuelve a armar el formulario si cambia la cuenta o el perfil
+  return <Editor key={state.account?.userId ?? 'demo'} />;
+}
+
+function Editor() {
+  const router = useRouter();
   const { actions } = useApp();
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   const [name, setName] = useState(myBusiness.name);
   const [categorySlug, setCategorySlug] = useState(myBusiness.categorySlug);
@@ -421,16 +448,21 @@ export default function EditarPerfil() {
           </View>
         ) : (
           <Button
-            label={valid ? 'Guardar perfil' : 'Completa nombre, especialidad y modalidad'}
-            icon={valid ? 'checkmark' : undefined}
-            disabled={!valid}
-            onPress={() => {
-              actions.saveProfile(patch);
-              setSaved(true);
+            label={saving ? 'Guardando…' : valid ? 'Guardar perfil' : 'Completa nombre, especialidad y modalidad'}
+            icon={valid && !saving ? 'checkmark' : undefined}
+            disabled={!valid || saving}
+            onPress={async () => {
+              setSaving(true);
+              setSaveError(false);
+              const ok = await actions.saveProfile(patch);
+              setSaving(false);
+              if (ok === false) setSaveError(true);
+              else setSaved(true);
             }}
           />
         )}
         {saved ? <Text style={styles.savedNote}>Perfil guardado. Ya apareces así en las búsquedas.</Text> : null}
+        {saveError ? <Text style={[styles.savedNote, { color: '#A32020' }]}>No se pudo guardar en línea. Revisa tu internet y vuelve a intentar.</Text> : null}
       </BottomBar>
     </View>
   );

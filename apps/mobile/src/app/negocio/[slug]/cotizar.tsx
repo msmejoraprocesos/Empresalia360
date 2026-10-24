@@ -6,12 +6,14 @@ import { BottomBar, Button, Card, EmptyState, Field, Header, OptionPill } from '
 import { Brand } from '@/constants/theme';
 import { getBusiness } from '@/data';
 import { track, useBusinessScreen } from '@/lib/analytics';
+import { useLoginGate } from '@/lib/auth';
 import { useApp } from '@/store/app';
 
 export default function Cotizar() {
   const { slug, item: itemParam } = useLocalSearchParams<{ slug: string; item?: string }>();
   const router = useRouter();
   const { actions } = useApp();
+  const gate = useLoginGate();
   const b = getBusiness(slug);
   const quotable = b?.items.filter((i) => i.kind === 'cotizacion') ?? [];
   const [itemId, setItemId] = useState(itemParam ?? quotable[0]?.id);
@@ -73,11 +75,11 @@ export default function Cotizar() {
         <Button
           label="Enviar solicitud"
           disabled={description.trim().length < 5}
-          onPress={() => {
+          onPress={() => gate(() => {
             if (item) track(b, 'seleccion', { itemId: item.id });
             actions.requestQuote({ business: b, item, description });
             setSent(true);
-          }}
+          })}
           style={{ backgroundColor: Brand.jacaranda }}
         />
       </BottomBar>

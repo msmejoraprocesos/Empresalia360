@@ -5,6 +5,7 @@ import { Card, Header, ListRow } from '@/components/ui';
 import { Brand, TabBarSpace } from '@/constants/theme';
 import { getBusiness } from '@/data';
 import { catalogStatus } from '@/data/remote';
+import { signOut } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useApp } from '@/store/app';
 
@@ -21,13 +22,26 @@ export default function Perfil() {
             <Text style={styles.avatarText}>{state.userName.slice(0, 2).toUpperCase()}</Text>
           </View>
           <View>
-            <Text style={styles.name}>{state.userName} G.</Text>
+            <Text style={styles.name}>{state.account ? state.account.name || state.userName : `${state.userName} G.`}</Text>
             <Text style={styles.sub}>Cliente Frecuente · Querétaro</Text>
           </View>
         </View>
       </Header>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: TabBarSpace }}>
+        {isSupabaseConfigured ? (
+          <Card style={{ paddingVertical: 4 }}>
+            <ListRow
+              icon={state.account ? 'person-circle-outline' : 'mail-outline'}
+              iconBg={Brand.chileSoft}
+              iconColor={Brand.chileDark}
+              title={state.account ? 'Mi cuenta' : 'Entrar o crear cuenta'}
+              subtitle={state.account ? state.account.email : 'Con tu correo, sin contraseña. Para agendar y opinar.'}
+              onPress={() => router.push('/entrar')}
+              last
+            />
+          </Card>
+        ) : null}
         <Card style={{ paddingVertical: 4 }}>
           <ListRow icon="gift-outline" iconBg={Brand.mangoSoft} iconColor="#7A5600" title="Puntos, sellos y cupones" subtitle={`${state.points.toLocaleString('es-MX')} puntos`} onPress={() => router.push('/lealtad')} />
           <ListRow icon="qr-code-outline" title="Mi QR" subtitle="Muéstralo al pagar para sumar sellos" onPress={() => router.push('/qr')} />
@@ -69,6 +83,7 @@ export default function Perfil() {
             icon="log-out-outline"
             title="Cerrar sesión"
             onPress={() => {
+              void signOut();
               actions.setRole(null);
               router.replace('/bienvenida');
             }}

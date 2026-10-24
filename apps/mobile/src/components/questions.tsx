@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { Brand, Radius, Shadow } from '@/constants/theme';
 import { CATEGORIES, categoryBySlug, getBusiness } from '@/data';
 import type { Question } from '@/data/types';
+import { useLoginGate } from '@/lib/auth';
 import { useApp } from '@/store/app';
 
 import { ProAvatar } from './business-card';
@@ -14,6 +15,7 @@ import { Button, Chip } from './ui';
 /** Formulario para que el cliente pregunte a los expertos de una categoría. */
 export function AskForm() {
   const { state, actions } = useApp();
+  const gate = useLoginGate();
   const cats = CATEGORIES.filter((c) => c.group === state.lookingFor);
   const [picked, setCategorySlug] = useState<string>();
   const categorySlug = picked && cats.some((c) => c.slug === picked) ? picked : cats[0]?.slug ?? 'abogados';
@@ -53,11 +55,11 @@ export function AskForm() {
         label="Publicar pregunta"
         small
         disabled={body.trim().length < 10}
-        onPress={() => {
+        onPress={() => gate(() => {
           actions.askQuestion({ categorySlug, body: body.trim() });
           setBody('');
           setSent(true);
-        }}
+        })}
       />
     </View>
   );
@@ -67,6 +69,7 @@ export function AskForm() {
 export function QuestionCard({ q, canAnswer }: { q: Question; canAnswer?: boolean }) {
   const router = useRouter();
   const { state, actions } = useApp();
+  const gate = useLoginGate();
   const [answer, setAnswer] = useState('');
   const cat = categoryBySlug(q.categorySlug);
 
@@ -98,7 +101,7 @@ export function QuestionCard({ q, canAnswer }: { q: Question; canAnswer?: boolea
               <Text style={styles.link}>Ver perfil</Text>
             </Pressable>
             <Text style={styles.body}>{a.body}</Text>
-            <Pressable accessibilityRole="button" onPress={() => actions.markHelpful(q.id, i)} style={styles.helpful}>
+            <Pressable accessibilityRole="button" onPress={() => gate(() => actions.markHelpful(q.id, i))} style={styles.helpful}>
               <Ionicons name={marked ? 'thumbs-up' : 'thumbs-up-outline'} size={15} color={marked ? Brand.chile : Brand.inkSoft} />
               <Text style={[styles.sub, marked && { color: Brand.chile, fontWeight: '700' }]}>Útil · {a.helpful}</Text>
             </Pressable>
@@ -122,10 +125,10 @@ export function QuestionCard({ q, canAnswer }: { q: Question; canAnswer?: boolea
             small
             variant="dark"
             disabled={answer.trim().length < 10}
-            onPress={() => {
+            onPress={() => gate(() => {
               actions.answerQuestion(q.id, answer.trim());
               setAnswer('');
-            }}
+            })}
           />
         </View>
       ) : null}

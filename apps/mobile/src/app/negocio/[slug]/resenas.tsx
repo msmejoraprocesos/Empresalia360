@@ -6,6 +6,7 @@ import { Button, Card, Chip, EmptyState, Field, Header, Segmented, StarInput, St
 import { Brand, Radius } from '@/constants/theme';
 import { getBusiness } from '@/data';
 import { useBusinessScreen } from '@/lib/analytics';
+import { useLoginGate } from '@/lib/auth';
 import { useApp } from '@/store/app';
 
 const PAID: Record<string, string> = { efectivo: 'efectivo', tarjeta: 'tarjeta', transferencia: 'transferencia', liga: 'pago en línea' };
@@ -13,6 +14,7 @@ const PAID: Record<string, string> = { efectivo: 'efectivo', tarjeta: 'tarjeta',
 export default function Resenas() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { state, actions } = useApp();
+  const gate = useLoginGate();
   const b = getBusiness(slug);
   const [tab, setTab] = useState<'expertalia' | 'google'>('expertalia');
   const [writing, setWriting] = useState(false);
@@ -81,11 +83,11 @@ export default function Resenas() {
                 <Button
                   label="Publicar (+50 puntos)"
                   disabled={body.trim().length < 3}
-                  onPress={() => {
+                  onPress={() => gate(() => {
                     actions.addReview(b.slug, rating, body.trim());
                     setWriting(false);
                     setBody('');
-                  }}
+                  })}
                 />
               </Card>
             ) : (

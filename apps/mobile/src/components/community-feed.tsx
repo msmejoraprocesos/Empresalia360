@@ -8,6 +8,7 @@ import { getBusiness } from '@/data';
 import type { Post } from '@/data/types';
 import { markSource } from '@/lib/analytics';
 import { money } from '@/lib/format';
+import { useLoginGate } from '@/lib/auth';
 import { useApp } from '@/store/app';
 
 import { ProAvatar, Tag } from './business-card';
@@ -51,6 +52,7 @@ export function FeedFilters({ value, onChange }: { value: FeedFilter; onChange: 
 export function PostCard({ post, compact }: { post: Post; compact?: boolean }) {
   const router = useRouter();
   const { state, actions } = useApp();
+  const gate = useLoginGate();
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState('');
   const b = getBusiness(post.businessSlug);
@@ -100,7 +102,7 @@ export function PostCard({ post, compact }: { post: Post; compact?: boolean }) {
       ) : null}
 
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" accessibilityLabel={liked ? 'Quitar me sirve' : 'Me sirve'} onPress={() => actions.toggleLike(post.id)} style={styles.action}>
+        <Pressable accessibilityRole="button" accessibilityLabel={liked ? 'Quitar me sirve' : 'Me sirve'} onPress={() => gate(() => actions.toggleLike(post.id))} style={styles.action}>
           <Emoji name="pulgar" size={20} style={liked ? undefined : { opacity: 0.55 }} />
           <Text style={[styles.actionText, liked && { color: Brand.chile }]}>Me sirve · {post.likes}</Text>
         </Pressable>
@@ -141,10 +143,10 @@ export function PostCard({ post, compact }: { post: Post; compact?: boolean }) {
               accessibilityRole="button"
               accessibilityLabel="Enviar comentario"
               disabled={!comment.trim()}
-              onPress={() => {
+              onPress={() => gate(() => {
                 actions.addComment(post.id, author, comment.trim());
                 setComment('');
-              }}
+              })}
               style={[styles.send, !comment.trim() && { opacity: 0.4 }]}>
               <Ionicons name="send" size={16} color={Brand.white} />
             </Pressable>

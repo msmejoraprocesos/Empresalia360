@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Header, ListRow } from '@/components/ui';
 import { Brand, TabBarSpace } from '@/constants/theme';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { myBusiness, useApp } from '@/store/app';
 
 export default function Mas() {
@@ -14,6 +15,19 @@ export default function Mas() {
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
       <Header title="Más" subtitle={myBusiness.name} back={false} color={Brand.ink} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: TabBarSpace }}>
+        {isSupabaseConfigured ? (
+          <Card style={{ paddingVertical: 4 }}>
+            <ListRow
+              icon={state.account ? 'person-circle-outline' : 'mail-outline'}
+              iconBg={Brand.chileSoft}
+              iconColor={Brand.chileDark}
+              title={state.account ? 'Mi cuenta' : 'Entrar para guardar mi perfil'}
+              subtitle={state.account ? state.account.email : 'Con tu correo, sin contraseña'}
+              onPress={() => router.push('/entrar')}
+              last
+            />
+          </Card>
+        ) : null}
         <Text style={styles.section}>Mi perfil</Text>
         <Card style={{ paddingVertical: 4 }}>
           <ListRow icon="person-circle-outline" iconBg={Brand.chileSoft} iconColor={Brand.chileDark} title="Editar perfil y especialidades" subtitle={myBusiness.specialties.join(', ') || 'Agrega tus especialidades'} onPress={() => router.push('/mi-negocio/perfil')} />

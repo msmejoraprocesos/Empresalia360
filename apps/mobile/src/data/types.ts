@@ -44,11 +44,12 @@ export type Question = {
   specialty?: string;
   body: string;
   dateLabel: string;
-  answers: { businessSlug: string; body: string; helpful: number }[];
+  answers: { id?: string; businessSlug: string; body: string; helpful: number }[];
 };
 
 export type Post = {
   id: string;
+  photo?: string;
   businessSlug: string;
   kind: 'servicio' | 'consejo' | 'evento';
   title: string;
@@ -64,6 +65,7 @@ export type Post = {
 
 export type IncomingRequest = {
   id: string;
+  customerPhone?: string;
   type: 'cita' | 'cotizacion' | 'contratacion';
   /** Monto ya pagado o por cobrar en contrataciones */
   amount?: number;

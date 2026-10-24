@@ -23,7 +23,7 @@ export async function pickPhoto(source: PhotoSource, aspect: [number, number] = 
 }
 
 /** Sube la foto y regresa su liga pública; si no se puede subir, regresa la foto local. */
-export async function uploadPhoto(uri: string, folder: 'productos' | 'promociones' | 'anuncios', businessSlug: string): Promise<string> {
+export async function uploadPhoto(uri: string, folder: 'productos' | 'promociones' | 'anuncios' | 'perfil' | 'galeria' | 'muro', businessSlug: string): Promise<string> {
   if (!supabase || uri.startsWith('http')) return uri;
   try {
     const { data: session } = await supabase.auth.getSession();

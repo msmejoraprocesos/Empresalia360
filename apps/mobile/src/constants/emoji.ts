@@ -73,6 +73,8 @@ export const EMOJI = {
   manos_arriba: require('../../assets/emoji/manos_arriba.svg'),
   ojo: require('../../assets/emoji/ojo.svg'),
   candado: require('../../assets/emoji/candado.svg'),
+  sobre: require('../../assets/emoji/sobre.svg'),
+  llave_entrar: require('../../assets/emoji/llave_entrar.svg'),
   familia: require('../../assets/emoji/familia.svg'),
   anillo: require('../../assets/emoji/anillo.svg'),
   carrito: require('../../assets/emoji/carrito.svg'),

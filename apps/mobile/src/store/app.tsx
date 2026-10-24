@@ -2,7 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { OPENING_ADS, type OpeningAd } from '@/data/ads';
 import { BUSINESSES, INCOMING_REQUESTS, INITIAL_ORDERS, MY_BUSINESS_SLUG, POSTS, PROMOTIONS, QUESTIONS } from '@/data/mock';
+import { loadAccount, loadCommunity, remote, saveBusiness, type AccountData } from '@/data/remote';
 import { track } from '@/lib/analytics';
+import { uploadPhoto } from '@/lib/photos';
+import { supabase } from '@/lib/supabase';
 import type { Business, CatalogItem, IncomingRequest, Order, OrderMode, PaymentMethod, Post, Question, Review, Role, Sale } from '@/data/types';
 
 // ─────────────────────────────────────────────────────────────
@@ -73,8 +76,12 @@ export type ProfilePatch = Partial<
 
 export type LookingFor = 'profesionales' | 'oficios';
 
+/** Persona que entró con su correo (solo con Supabase conectado) */
+export type Account = { userId: string; email?: string; name: string; businessSlug: string | null };
+
 type State = {
   role: Role | null;
+  account: Account | null;
   /** Qué busca el cliente: lo elige en el inicio y se respeta en búsqueda y mapa */
   lookingFor: LookingFor;
   /** Ya eligió mundo al menos una vez */
@@ -93,6 +100,8 @@ type State = {
   likedPosts: string[];
   questions: Question[];
   helpful: string[];
+  /** Respuestas que marcó como útiles (ids de Supabase) */
+  helpfulIds: string[];
   // profesional
   profileVersion: number;
   biz: { disponible: boolean; nuevosClientes: boolean; enLinea: boolean };
@@ -111,10 +120,25 @@ type State = {
   feedWeights: { afinidad: number; cercania: number; calificacion: number; urgencia: number; abierto: number };
 };
 
-const myBusiness = BUSINESSES.find((b) => b.slug === MY_BUSINESS_SLUG) as Business;
+// Perfil profesional que se edita en "Mi negocio". Sin Supabase es el perfil de ejemplo; con
+// sesión es el perfil de la persona, o uno en blanco si todavía no lo crea.
+let myBusiness = BUSINESSES.find((b) => b.slug === MY_BUSINESS_SLUG) as Business;
+const demoBusiness = myBusiness;
+
+function blankBusiness(name: string): Business {
+  return {
+    id: 'nuevo', slug: 'mi-perfil', name, categorySlug: 'abogados', subtitle: '', description: '', address: '', zone: demoBusiness.zone,
+    lat: demoBusiness.lat, lng: demoBusiness.lng, rating: 0, ratingCount: 0, isOpen: true, closesAt: '18:00', phone: '', profession: '',
+    specialties: [], yearsExp: 0, languages: ['Español'], attends: ['despacho'], modules: ['reservar', 'cotizar', 'consulta'],
+    delivers: false, verified: false, items: [], reviews: [], gallery: [],
+  };
+}
+
+const online = supabase !== null;
 
 const initialState: State = {
   role: null,
+  account: null,
   lookingFor: 'profesionales',
   worldChosen: false,
   isAdmin: false,
@@ -123,10 +147,11 @@ const initialState: State = {
   points: 1240,
   favorites: ['plomeria-hernandez', 'despacho-contable-reyes'],
   cart: { businessSlug: null, mode: 'para_llevar', lines: {} },
-  orders: INITIAL_ORDERS,
+  // Con Supabase, las citas y solicitudes reales llegan al entrar
+  orders: online ? [] : INITIAL_ORDERS,
   stamps: { 'despacho-contable-reyes': 9, 'plomeria-hernandez': 2, 'lic-mariana-ortiz': 1 },
   userReviews: {},
-  quotes: [
+  quotes: online ? [] : [
     {
       id: 'q1',
       businessSlug: 'ortiz-salinas-abogados',
@@ -146,18 +171,19 @@ const initialState: State = {
   likedPosts: [],
   questions: QUESTIONS,
   helpful: [],
+  helpfulIds: [],
   profileVersion: 0,
   biz: { disponible: true, nuevosClientes: true, enLinea: true },
   myItems: myBusiness.items,
-  sales: [
+  sales: online ? [] : [
     { id: 's1', amount: 500, method: 'tarjeta', customerName: 'Ana G.', customerPhone: '4423180094', createdAt: Date.now() - 50 * 60000 },
     { id: 's2', amount: 7000, method: 'transferencia', customerName: 'Lucía P.', createdAt: Date.now() - 95 * 60000 },
     { id: 's3', amount: 500, method: 'efectivo', customerName: 'Pedro S.', createdAt: Date.now() - 130 * 60000 },
   ],
-  requests: INCOMING_REQUESTS,
+  requests: online ? [] : INCOMING_REQUESTS,
   replies: {},
   myAds: [],
-  myPromotions: [{ id: 'mp1', title: 'Primera consulta en línea a $350', target: 'Clientes nuevos', reach: 412, redemptions: 38, active: true }],
+  myPromotions: online ? [] : [{ id: 'mp1', title: 'Primera consulta en línea a $350', target: 'Clientes nuevos', reach: 412, redemptions: 38, active: true }],
   supplyRequests: [
     {
       id: 'sr1',
@@ -228,6 +254,13 @@ function saveRole(role: Role | null) {
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
+/** Convierte ids de respuestas útiles en las llaves "pregunta:índice" que usan las pantallas */
+function helpfulKeys(questions: Question[], ids: string[]): string[] {
+  const keys: string[] = [];
+  for (const q of questions) q.answers.forEach((a, i) => a.id && ids.includes(a.id) && keys.push(`${q.id}:${i}`));
+  return keys;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Contexto
 // ─────────────────────────────────────────────────────────────
@@ -248,8 +281,54 @@ function useAppState() {
     }
   }, [state.lookingFor, state.worldChosen]);
 
+  // ── Supabase: cuenta, citas y solicitudes de quien entró ──
+  const refreshCommunity = useCallback(async () => {
+    const r = await loadCommunity();
+    if (r) update((s) => ({ ...s, posts: r.posts, questions: r.questions, helpful: helpfulKeys(r.questions, s.helpfulIds) }));
+  }, [update]);
+
+  const applyAccount = useCallback(
+    (acc: AccountData | null) => {
+      if (!acc) {
+        myBusiness = demoBusiness;
+        update((s) => ({ ...s, account: null, orders: [], requests: [], likedPosts: [], helpful: [], helpfulIds: [], myItems: myBusiness.items, profileVersion: s.profileVersion + 1 }));
+        return;
+      }
+      const own = acc.businessSlug ? BUSINESSES.find((b) => b.slug === acc.businessSlug) : undefined;
+      myBusiness = own ?? blankBusiness(acc.name);
+      update((s) => ({
+        ...s,
+        account: { userId: acc.userId, email: acc.email, name: acc.name, businessSlug: acc.businessSlug },
+        userName: acc.name.split(' ')[0] || s.userName,
+        orders: acc.orders,
+        requests: acc.requests,
+        likedPosts: acc.likedPosts,
+        helpfulIds: acc.helpfulAnswers,
+        helpful: helpfulKeys(s.questions, acc.helpfulAnswers),
+        myItems: myBusiness.items,
+        profileVersion: s.profileVersion + 1,
+      }));
+    },
+    [update],
+  );
+
+  const refreshAccount = useCallback(async () => applyAccount(await loadAccount()), [applyAccount]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      // Las llamadas a Supabase van fuera del aviso (así lo pide la librería)
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        setTimeout(() => (session ? refreshAccount() : applyAccount(null)), 0);
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, [applyAccount, refreshAccount]);
+
   const actions = useMemo(
     () => ({
+      refreshAccount,
+      refreshCommunity,
       setRole: (role: Role | null) => update((s) => ({ ...s, role })),
       setAdmin: (isAdmin: boolean) => update((s) => ({ ...s, isAdmin })),
       setLookingFor: (lookingFor: LookingFor) => update((s) => ({ ...s, lookingFor, worldChosen: true })),
@@ -283,8 +362,13 @@ function useAppState() {
             id, type: 'pedido', businessSlug: o.business.slug, businessName: o.business.name, detail, total: o.total, status: 'recibido',
             createdAt: Date.now(), lines, mode: o.mode, paymentMethod: o.method, deliveryNote: o.note, customerName: `${s.userName} G.`,
           };
+          if (online) {
+            remote
+              .request({ business: o.business, type: 'contratacion', detail, when: 'Pagado ahora', amount: o.total, paymentMethod: o.method, attend: o.mode === 'domicilio' ? 'domicilio' : o.mode === 'en_local' ? 'en_linea' : 'despacho', specialty: lines[0]?.name })
+              .then(() => refreshAccount());
+          }
           const requests: IncomingRequest[] =
-            o.business.slug === MY_BUSINESS_SLUG
+            !online && o.business.slug === myBusiness.slug
               ? [{ id, type: 'contratacion', customer: `${s.userName} G.`, specialty: lines[0]?.name ?? '', detail, when: 'Pagado ahora', attend: o.mode === 'domicilio' ? 'domicilio' : o.mode === 'en_local' ? 'en_linea' : 'despacho', status: 'nueva', amount: o.total, paymentMethod: o.method }, ...s.requests]
               : s.requests;
           return { ...s, points: s.points + 20, orders: [order, ...s.orders], requests, cart: { ...s.cart, businessSlug: null, lines: {} } };
@@ -295,6 +379,11 @@ function useAppState() {
       // Cliente
       bookAppointment: (b: { business: Business; item: CatalogItem; staff: string; label: string; total: number }) => {
         track(b.business, 'reserva');
+        if (online) {
+          remote
+            .request({ business: b.business, type: 'cita', detail: `${b.item.name}${b.staff !== 'Cualquiera' ? ` con ${b.staff}` : ''}`, when: b.label, specialty: b.business.specialties[0], itemId: b.item.id, amount: b.total || undefined })
+            .then(() => refreshAccount());
+        }
         update((s) => {
           const order: Order = {
             id: uid(),
@@ -308,7 +397,7 @@ function useAppState() {
           };
           // Si la cita es con el perfil de ejemplo del profesional, le llega como solicitud
           const requests: IncomingRequest[] =
-            b.business.slug === MY_BUSINESS_SLUG
+            !online && b.business.slug === myBusiness.slug
               ? [{ id: order.id, type: 'cita', customer: `${s.userName} G.`, specialty: b.business.specialties[0] ?? '', detail: b.item.name, when: b.label, attend: b.business.attends[0], status: 'nueva' }, ...s.requests]
               : s.requests;
           return { ...s, orders: [order, ...s.orders], requests };
@@ -317,10 +406,15 @@ function useAppState() {
 
       requestQuote: (q: { business: Business; item?: CatalogItem; description: string }) => {
         track(q.business, 'cotizacion');
+        if (online) {
+          remote
+            .request({ business: q.business, type: 'cotizacion', detail: `${q.item?.name ?? 'Cotización'} · ${q.description}`, when: 'Recibida ahora', specialty: q.item?.section ?? q.business.specialties[0], itemId: q.item?.id })
+            .then(() => refreshAccount());
+        }
         update((s) => {
           const id = uid();
           const requests: IncomingRequest[] =
-            q.business.slug === MY_BUSINESS_SLUG
+            !online && q.business.slug === myBusiness.slug
               ? [{ id, type: 'cotizacion', customer: `${s.userName} G.`, specialty: q.item?.section ?? q.business.specialties[0] ?? '', detail: `${q.item?.name ?? 'Cotización'} · ${q.description}`, when: 'Recibida ahora', attend: q.business.attends[0], status: 'nueva' }, ...s.requests]
               : s.requests;
           return {
@@ -337,7 +431,9 @@ function useAppState() {
       setQuoteStatus: (id: string, status: Quote['status']) =>
         update((s) => ({ ...s, quotes: s.quotes.map((q) => (q.id === id ? { ...q, status } : q)) })),
 
-      addReview: (businessSlug: string, rating: number, body: string, orderId?: string) =>
+      addReview: (businessSlug: string, rating: number, body: string, orderId?: string) => {
+        const target = BUSINESSES.find((b) => b.slug === businessSlug);
+        if (online && target) void remote.review(target, rating, body);
         update((s) => ({
           ...s,
           points: s.points + 50,
@@ -349,50 +445,82 @@ function useAppState() {
             ],
           },
           orders: orderId ? s.orders.map((o) => (o.id === orderId ? { ...o, rated: true } : o)) : s.orders,
-        })),
+        }));
+      },
 
       // Comunidad
       toggleLike: (postId: string) =>
         update((s) => {
           const liked = s.likedPosts.includes(postId);
+          if (online) void remote.like(postId, !liked);
           return {
             ...s,
             likedPosts: liked ? s.likedPosts.filter((p) => p !== postId) : [...s.likedPosts, postId],
             posts: s.posts.map((p) => (p.id === postId ? { ...p, likes: p.likes + (liked ? -1 : 1) } : p)),
           };
         }),
-      addComment: (postId: string, author: string, body: string) =>
-        update((s) => ({ ...s, posts: s.posts.map((p) => (p.id === postId ? { ...p, comments: [...p.comments, { author, body }] } : p)) })),
-      askQuestion: (q: { categorySlug: string; specialty?: string; body: string }) =>
-        update((s) => ({ ...s, questions: [{ ...q, id: uid(), author: `${s.userName} G.`, dateLabel: 'ahora', answers: [] }, ...s.questions] })),
-      answerQuestion: (questionId: string, body: string) =>
+      addComment: (postId: string, author: string, body: string) => {
+        if (online) void remote.comment(postId, body);
+        update((s) => ({ ...s, posts: s.posts.map((p) => (p.id === postId ? { ...p, comments: [...p.comments, { author, body }] } : p)) }));
+      },
+      askQuestion: (q: { categorySlug: string; specialty?: string; body: string }) => {
+        if (online) void remote.ask(q.categorySlug, q.body, q.specialty).then((ok) => { if (ok) void refreshCommunity(); });
+        update((s) => ({ ...s, questions: [{ ...q, id: uid(), author: `${s.userName} G.`, dateLabel: 'ahora', answers: [] }, ...s.questions] }));
+      },
+      answerQuestion: (questionId: string, body: string) => {
+        if (online) void remote.answer(questionId, myBusiness, body).then((ok) => { if (ok) void refreshCommunity(); });
         update((s) => ({
           ...s,
           questions: s.questions.map((q) => (q.id === questionId ? { ...q, answers: [...q.answers, { businessSlug: myBusiness.slug, body, helpful: 0 }] } : q)),
-        })),
+        }));
+      },
       markHelpful: (questionId: string, index: number) =>
         update((s) => {
           const key = `${questionId}:${index}`;
           if (s.helpful.includes(key)) return s;
+          if (online) void remote.helpful(s.questions.find((q) => q.id === questionId)?.answers[index]?.id);
           return {
             ...s,
             helpful: [...s.helpful, key],
             questions: s.questions.map((q) => (q.id === questionId ? { ...q, answers: q.answers.map((a, i) => (i === index ? { ...a, helpful: a.helpful + 1 } : a)) } : q)),
           };
         }),
-      publishPost: (p: Omit<Post, 'id' | 'businessSlug' | 'dateLabel' | 'likes' | 'comments'>) =>
+      publishPost: (p: Omit<Post, 'id' | 'businessSlug' | 'dateLabel' | 'likes' | 'comments'>) => {
+        if (online) void remote.post(myBusiness, p).then((ok) => { if (ok) void refreshCommunity(); });
         update((s) => ({
           ...s,
           posts: [{ ...p, id: uid(), businessSlug: myBusiness.slug, dateLabel: 'ahora', likes: 0, comments: [] }, ...s.posts],
-        })),
+        }));
+      },
 
       // Profesional
-      saveProfile: (patch: ProfilePatch) => {
+      /** Guarda el perfil. Regresa true si quedó guardado en línea, false si falló y null si no hay Supabase o sesión. */
+      saveProfile: async (patch: ProfilePatch): Promise<boolean | null> => {
         // El perfil se actualiza en el directorio y aparece de inmediato en las búsquedas
         Object.assign(myBusiness, patch);
         update((s) => ({ ...s, profileVersion: s.profileVersion + 1 }));
+        if (!online) return null;
+        const saved = await saveBusiness(myBusiness, patch, (uri, folder, slug) => uploadPhoto(uri, folder, slug));
+        if (!saved) return false;
+        const existing = BUSINESSES.find((b) => b.slug === saved.slug);
+        if (existing) Object.assign(existing, saved);
+        else BUSINESSES.push(Object.assign(myBusiness, saved));
+        myBusiness = existing ?? myBusiness;
+        await refreshAccount();
+        return true;
       },
-      toggleBiz: (key: keyof State['biz']) => update((s) => ({ ...s, biz: { ...s.biz, [key]: !s.biz[key] } })),
+      claimProfile: (business: Business, license?: string) => remote.claim(business, license),
+      setName: (name: string) => {
+        if (online) void remote.setName(name);
+        update((s) => ({ ...s, userName: name.split(' ')[0] || s.userName, account: s.account ? { ...s.account, name } : s.account }));
+      },
+      toggleBiz: (key: keyof State['biz']) =>
+        update((s) => {
+          const v = !s.biz[key];
+          if (online && key === 'disponible') void remote.setAvailability(myBusiness, { available: v });
+          if (online && key === 'nuevosClientes') void remote.setAvailability(myBusiness, { accepts_new: v });
+          return { ...s, biz: { ...s.biz, [key]: v } };
+        }),
       addItem: (item: Omit<CatalogItem, 'id'>) => {
         const created = { ...item, id: uid() };
         if (!myBusiness.items.some((i) => i.id === created.id)) myBusiness.items.push(created);
@@ -442,7 +570,8 @@ function useAppState() {
             p.id === id ? (answer.hasIt ? { ...p, status: 'ofertada', offerPrice: answer.price, readyIn: answer.readyIn } : { ...p, status: 'no_tengo' }) : p,
           ),
         })),
-      respondRequest: (id: string, status: IncomingRequest['status'], quotedPrice?: number) =>
+      respondRequest: (id: string, status: IncomingRequest['status'], quotedPrice?: number) => {
+        if (online) void remote.respondRequest(id, status, quotedPrice);
         update((s) => ({
           ...s,
           requests: s.requests.map((r) => (r.id === id ? { ...r, status, quotedPrice: quotedPrice ?? r.quotedPrice } : r)),
@@ -450,8 +579,12 @@ function useAppState() {
           orders: s.orders.map((o) =>
             o.id === id ? { ...o, status: status === 'rechazada' ? 'cancelado' : status === 'cotizada' ? 'esperando' : 'confirmada', total: quotedPrice ?? o.total } : o,
           ),
-        })),
-      replyReview: (reviewId: string, text: string) => update((s) => ({ ...s, replies: { ...s.replies, [reviewId]: text } })),
+        }));
+      },
+      replyReview: (reviewId: string, text: string) => {
+        if (online) void remote.replyReview(reviewId, text);
+        update((s) => ({ ...s, replies: { ...s.replies, [reviewId]: text } }));
+      },
 
       // Publicidad
       buyAd: (ad: Omit<AdCampaign, 'id' | 'status'>) =>
@@ -475,7 +608,7 @@ function useAppState() {
       setWeight: (key: keyof State['feedWeights'], value: number) =>
         update((s) => ({ ...s, feedWeights: { ...s.feedWeights, [key]: Math.max(0, Math.min(100, value)) } })),
     }),
-    [update],
+    [update, refreshAccount, refreshCommunity],
   );
 
   return { state, actions };
