@@ -1,6 +1,8 @@
 import type { ComponentProps } from 'react';
 import type Ionicons from '@expo/vector-icons/Ionicons';
 
+import type { EmojiName } from '@/constants/emoji';
+
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
 export type Role = 'vecino' | 'negocio' | 'repartidor';
@@ -13,6 +15,8 @@ export type OrderMode = 'para_llevar' | 'domicilio' | 'en_local';
 
 export type Specialty = {
   name: string;
+  /** Dibujo que la representa, para quien no lee */
+  emoji?: EmojiName;
   /** Palabras con las que un cliente describe su problema ("despido", "fuga", "divorcio") */
   keywords: string[];
 };
@@ -26,6 +30,8 @@ export type Category = {
   color: string;
   ink: string;
   icon: IconName;
+  /** Dibujo a color de la categoría */
+  emoji: EmojiName;
   specialties: Specialty[];
 };
 

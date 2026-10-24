@@ -1,31 +1,41 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AVATARS } from '@/constants/avatars';
+import type { EmojiName } from '@/constants/emoji';
 import { Brand, Radius, Shadow } from '@/constants/theme';
-import { ATTEND_ICON, ATTEND_LABEL, categoryBySlug, distanceTo, initials } from '@/data';
-import type { Business } from '@/data/types';
+import { ATTEND_LABEL, categoryBySlug, distanceTo, initials, primaryAction, specialtyEmoji } from '@/data';
+import type { Attend, Business } from '@/data/types';
 import type { Source } from '@/data/stats';
-import { markSource } from '@/lib/analytics';
+import { markSource, track } from '@/lib/analytics';
 import { distance, money } from '@/lib/format';
 
-import { Chip } from './ui';
+import { Emoji } from './emoji';
+import { Stars } from './ui';
 
-/** Avatar con iniciales y el color de la profesión. */
-export function ProAvatar({ business, size = 60 }: { business: Business; size?: number }) {
+export const ATTEND_EMOJI: Record<Attend, EmojiName> = { despacho: 'edificio', en_linea: 'laptop', domicilio: 'casa' };
+
+/** Foto del experto; si no subió una, su cara ilustrada o sus iniciales. Lleva el dibujo de su oficio. */
+export function ProAvatar({ business, size = 60, badge = true }: { business: Business; size?: number; badge?: boolean }) {
   const cat = categoryBySlug(business.categorySlug);
   const bg = cat?.color === Brand.line ? Brand.inkSoft : cat?.color ?? Brand.chile;
+  const art = AVATARS[business.slug];
+  const r = size * 0.32;
   return (
-    <View style={{ width: size, height: size, borderRadius: size * 0.32, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-      {business.photo ? (
-        <Image source={{ uri: business.photo }} style={{ width: size, height: size, borderRadius: size * 0.32 }} contentFit="cover" accessibilityLabel={`Foto de ${business.name}`} />
-      ) : (
-        <Text style={{ color: cat?.ink === Brand.mango ? Brand.mango : Brand.white, fontWeight: '800', fontSize: size * 0.36 }}>{initials(business.name).toUpperCase()}</Text>
-      )}
-      {business.verified ? (
-        <View style={[styles.badge, { width: size * 0.36, height: size * 0.36, borderRadius: size * 0.18 }]}>
-          <Ionicons name="checkmark" size={size * 0.22} color={Brand.white} />
+    <View style={{ width: size, height: size }}>
+      <View style={{ width: size, height: size, borderRadius: r, backgroundColor: bg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        {business.photo ? (
+          <Image source={{ uri: business.photo }} style={{ width: size, height: size }} contentFit="cover" accessibilityLabel={`Foto de ${business.name}`} />
+        ) : art ? (
+          <Image source={art} style={{ width: size, height: size }} contentFit="cover" accessibilityLabel={`Ilustración de ${business.name}`} />
+        ) : (
+          <Text style={{ color: cat?.ink === Brand.mango ? Brand.mango : Brand.white, fontWeight: '800', fontSize: size * 0.36 }}>{initials(business.name).toUpperCase()}</Text>
+        )}
+      </View>
+      {badge && cat ? (
+        <View style={[styles.badge, { width: size * 0.42, height: size * 0.42, borderRadius: size * 0.21, right: -size * 0.08, bottom: -size * 0.08 }]}>
+          <Emoji name={cat.emoji} size={size * 0.26} />
         </View>
       ) : null}
     </View>
@@ -35,10 +45,10 @@ export function ProAvatar({ business, size = 60 }: { business: Business; size?: 
 export function consultLabel(b: Business): string | null {
   if (b.consultPrice === undefined) return null;
   const what = b.attends.includes('domicilio') && !b.attends.includes('despacho') ? 'Visita' : 'Consulta';
-  return b.consultPrice === 0 ? `${what} sin costo` : `${what} ${money(b.consultPrice)}`;
+  return b.consultPrice === 0 ? `${what} gratis` : `${what} ${money(b.consultPrice)}`;
 }
 
-/** Tarjeta de un profesional u oficio en listas y resultados de búsqueda. */
+/** Tarjeta de un experto: se entiende por los dibujos y se actúa con dos botones grandes. */
 export function BusinessCard({
   business,
   sponsored,
@@ -54,75 +64,130 @@ export function BusinessCard({
   const router = useRouter();
   const specs = highlight && business.specialties.includes(highlight) ? [highlight, ...business.specialties.filter((s) => s !== highlight)] : business.specialties;
   const consult = consultLabel(business);
+  const action = primaryAction(business);
+  const go = () => {
+    markSource(source);
+    router.push(`/negocio/${business.slug}`);
+  };
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${business.name}, ${business.profession}`}
-      onPress={() => {
-        markSource(source);
-        router.push(`/negocio/${business.slug}`);
-      }}
-      style={({ pressed }) => [styles.card, Shadow, pressed && { opacity: 0.85 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${business.name}, ${business.profession}`} onPress={go} style={({ pressed }) => [styles.card, Shadow, pressed && { opacity: 0.9 }]}>
+      {sponsored ? (
+        <View style={styles.sponsor} accessibilityLabel="Destacado">
+          <Emoji name="estrella" size={14} />
+          <Text style={styles.sponsorText}>Destacado</Text>
+        </View>
+      ) : null}
       <View style={styles.row}>
-        <ProAvatar business={business} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.name} numberOfLines={1}>
-            {business.name}
-          </Text>
+        <ProAvatar business={business} size={72} />
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Text style={styles.name} numberOfLines={1}>
+              {business.name}
+            </Text>
+            {business.verified ? <Emoji name="palomita" size={16} label="Verificado" /> : null}
+          </View>
           <Text style={styles.sub} numberOfLines={1}>
             {business.profession}
-            {business.yearsExp ? ` · ${business.yearsExp} años de experiencia` : ''}
+            {business.yearsExp ? ` · ${business.yearsExp} años` : ''}
           </Text>
           <View style={styles.metaRow}>
-            <Ionicons name="star" size={13} color="#C98A0B" />
-            <Text style={styles.meta}>
-              <Text style={{ fontWeight: '800', color: Brand.ink }}>{business.rating.toFixed(1)}</Text> · {business.ratingCount} reseñas · {distance(distanceTo(business))}
-            </Text>
+            <Stars rating={business.rating} size={15} />
+            <Text style={styles.rating}>{business.rating.toFixed(1)}</Text>
+            <Text style={styles.meta}>({business.ratingCount})</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Emoji name="pin" size={14} />
+            <Text style={styles.meta}>{distance(distanceTo(business))}</Text>
+            {business.attends.map((a) => (
+              <Emoji key={a} name={ATTEND_EMOJI[a]} size={18} label={ATTEND_LABEL[a]} />
+            ))}
           </View>
         </View>
       </View>
 
       {specs.length ? (
         <View style={styles.chips}>
-          {specs.slice(0, 3).map((s) => (
-            <Chip key={s} label={s} color={s === highlight ? Brand.chile : Brand.chileSoft} ink={s === highlight ? Brand.white : Brand.chileDark} />
-          ))}
-          {specs.length > 3 ? <Chip label={`+${specs.length - 3}`} /> : null}
+          {specs.slice(0, 3).map((s) => {
+            const on = s === highlight;
+            return (
+              <View key={s} style={[styles.spec, on && { backgroundColor: Brand.chile, borderColor: Brand.chile }]}>
+                <Emoji name={specialtyEmoji(s)} size={16} />
+                <Text style={[styles.specText, on && { color: Brand.white }]}>{s}</Text>
+              </View>
+            );
+          })}
+          {specs.length > 3 ? (
+            <View style={styles.spec}>
+              <Text style={styles.specText}>+{specs.length - 3}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
-      <View style={styles.footer}>
-        <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', flex: 1 }}>
-          {business.attends.map((a) => (
-            <View key={a} style={styles.attend}>
-              <Ionicons name={ATTEND_ICON[a]} size={14} color={Brand.inkSoft} />
-              <Text style={styles.attendText}>{ATTEND_LABEL[a]}</Text>
-            </View>
-          ))}
-        </View>
-        {sponsored ? <Chip label="Destacado" color={Brand.mangoSoft} ink="#5A3E00" /> : consult ? <Text style={styles.consult}>{consult}</Text> : null}
-      </View>
-      {business.urgent24 || business.promo ? (
+      {business.urgent24 || consult || business.promo ? (
         <View style={styles.chips}>
-          {business.urgent24 ? <Chip label="Urgencias 24 h" color="#FDE2E2" ink="#A32020" icon="flash" /> : null}
-          {business.promo ? <Chip label={business.promo} color={Brand.chileSoft} ink={Brand.chileDark} icon="pricetag" /> : null}
+          {business.urgent24 ? <Tag emoji="sirena" text="Urgencias 24 h" bg="#FDE2E2" fg="#A32020" /> : null}
+          {consult ? <Tag emoji="billete" text={consult} bg={Brand.nopalSoft} fg={Brand.nopalDark} /> : null}
+          {business.promo ? <Tag emoji="etiqueta" text={business.promo} bg={Brand.mangoSoft} fg="#5A3E00" /> : null}
         </View>
       ) : null}
+
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Escribir a ${business.name} por WhatsApp`}
+          onPress={() => {
+            track(business, 'contacto', { screen: 'whatsapp' });
+            Linking.openURL(`https://wa.me/${business.phone}?text=${encodeURIComponent('Hola, te encontré en Expertalia 360')}`);
+          }}
+          style={({ pressed }) => [styles.actionBtn, { backgroundColor: '#25D366' }, pressed && { opacity: 0.85 }]}>
+          <Emoji name="globo_texto" size={22} />
+          <Text style={[styles.actionText, { color: Brand.white }]}>Mensaje</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            markSource(source);
+            router.push(action.module === 'reservar' ? `/negocio/${business.slug}/reservar` : `/negocio/${business.slug}/cotizar`);
+          }}
+          style={({ pressed }) => [styles.actionBtn, { backgroundColor: Brand.chile, flex: 1.3 }, pressed && { opacity: 0.85 }]}>
+          <Emoji name={action.module === 'reservar' ? 'calendario' : 'nota'} size={22} />
+          <Text style={[styles.actionText, { color: Brand.white }]}>{action.module === 'reservar' ? 'Agendar' : 'Cotizar'}</Text>
+        </Pressable>
+      </View>
     </Pressable>
+  );
+}
+
+export function Tag({ emoji, text, bg, fg }: { emoji: EmojiName; text: string; bg: string; fg: string }) {
+  return (
+    <View style={[styles.tag, { backgroundColor: bg }]}>
+      <Emoji name={emoji} size={16} />
+      <Text style={[styles.tagText, { color: fg }]} numberOfLines={1}>
+        {text}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: { backgroundColor: Brand.white, borderRadius: Radius.lg, padding: 14, gap: 10 },
-  row: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  badge: { position: 'absolute', right: -4, bottom: -4, backgroundColor: Brand.nopal, borderWidth: 2, borderColor: Brand.white, alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: 16, fontWeight: '800', color: Brand.ink },
-  sub: { fontSize: 13, color: Brand.inkSoft, marginTop: 2 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  meta: { fontSize: 12, color: Brand.inkSoft, flexShrink: 1 },
+  row: { flexDirection: 'row', gap: 14, alignItems: 'center' },
+  badge: { position: 'absolute', backgroundColor: Brand.white, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Brand.white, ...Shadow },
+  sponsor: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Brand.mangoSoft, borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 3, marginBottom: -2 },
+  sponsorText: { fontSize: 11, fontWeight: '800', color: '#5A3E00' },
+  name: { fontSize: 17, fontWeight: '800', color: Brand.ink, flexShrink: 1 },
+  sub: { fontSize: 13, color: Brand.inkSoft },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  rating: { fontSize: 14, fontWeight: '800', color: Brand.ink },
+  meta: { fontSize: 12, color: Brand.inkSoft },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: Brand.line, paddingTop: 10 },
-  attend: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  attendText: { fontSize: 12, color: Brand.inkSoft },
-  consult: { fontSize: 13, fontWeight: '800', color: Brand.nopalDark },
+  spec: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: Radius.pill, backgroundColor: Brand.chileSoft, borderWidth: 1, borderColor: Brand.chileSoft },
+  specText: { fontSize: 12, fontWeight: '700', color: Brand.chileDark },
+  tag: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: Radius.pill, maxWidth: '100%' },
+  tagText: { fontSize: 12, fontWeight: '800', flexShrink: 1 },
+  actions: { flexDirection: 'row', gap: 8 },
+  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: Radius.md },
+  actionText: { fontSize: 15, fontWeight: '800' },
 });

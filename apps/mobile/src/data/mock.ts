@@ -3,6 +3,7 @@
  * y sirven para probar la app mientras no esté conectada a su propio Supabase.
  */
 import { Brand } from '../constants/brand';
+import type { EmojiName } from '../constants/emoji';
 
 import type { Business, Category, IncomingRequest, Order, Post, Promotion, Question, Review } from './types';
 
@@ -13,7 +14,7 @@ const sp = (name: string, ...keywords: string[]) => ({ name, keywords });
 export const CATEGORIES: Category[] = [
   // ── Profesionales ──────────────────────────────────────────
   {
-    slug: 'abogados', name: 'Abogados', professional: 'Abogado', group: 'profesionales', color: Brand.chile, ink: Brand.white, icon: 'briefcase-outline',
+    slug: 'abogados', name: 'Abogados', professional: 'Abogado', group: 'profesionales', color: Brand.chile, ink: Brand.white, icon: 'briefcase-outline', emoji: 'balanza',
     specialties: [
       sp('Familiar', 'divorcio', 'pensión', 'pension', 'custodia', 'patria potestad', 'adopción'),
       sp('Laboral', 'despido', 'finiquito', 'liquidación', 'demanda laboral', 'trabajo', 'imss'),
@@ -25,7 +26,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'contadores', name: 'Contadores', professional: 'Contador', group: 'profesionales', color: Brand.nopal, ink: Brand.white, icon: 'calculator-outline',
+    slug: 'contadores', name: 'Contadores', professional: 'Contador', group: 'profesionales', color: Brand.nopal, ink: Brand.white, icon: 'calculator-outline', emoji: 'abaco',
     specialties: [
       sp('Declaración anual', 'declaración', 'declaracion', 'saldo a favor', 'devolución', 'impuestos'),
       sp('RESICO y personas físicas', 'resico', 'freelance', 'honorarios', 'arrendamiento'),
@@ -36,7 +37,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'notarias-y-tramites', name: 'Notarías y trámites', professional: 'Notario o gestor', group: 'profesionales', color: Brand.mango, ink: Brand.ink, icon: 'document-text-outline',
+    slug: 'notarias-y-tramites', name: 'Notarías y trámites', professional: 'Notario o gestor', group: 'profesionales', color: Brand.mango, ink: Brand.ink, icon: 'document-text-outline', emoji: 'pergamino',
     specialties: [
       sp('Escrituras', 'escritura', 'compraventa', 'casa', 'terreno'),
       sp('Testamentos', 'testamento', 'herencia'),
@@ -46,7 +47,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'psicologia-y-salud', name: 'Psicología y salud', professional: 'Especialista', group: 'profesionales', color: Brand.bugambilia, ink: Brand.white, icon: 'heart-outline',
+    slug: 'psicologia-y-salud', name: 'Psicología y salud', professional: 'Especialista', group: 'profesionales', color: Brand.bugambilia, ink: Brand.white, icon: 'heart-outline', emoji: 'cerebro',
     specialties: [
       sp('Terapia individual', 'terapia', 'psicólogo', 'psicologo', 'depresión'),
       sp('Terapia de pareja', 'pareja', 'matrimonio'),
@@ -56,7 +57,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'arquitectura', name: 'Arquitectura e ingeniería', professional: 'Arquitecto o ingeniero', group: 'profesionales', color: Brand.ink, ink: Brand.mango, icon: 'business-outline',
+    slug: 'arquitectura', name: 'Arquitectura e ingeniería', professional: 'Arquitecto o ingeniero', group: 'profesionales', color: Brand.ink, ink: Brand.mango, icon: 'business-outline', emoji: 'construccion',
     specialties: [
       sp('Proyecto arquitectónico', 'planos', 'diseño', 'casa nueva'),
       sp('Licencias de construcción', 'licencia', 'permiso', 'construcción'),
@@ -66,7 +67,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'consultoria', name: 'Consultoría y seguros', professional: 'Consultor', group: 'profesionales', color: Brand.jacaranda, ink: Brand.white, icon: 'trending-up-outline',
+    slug: 'consultoria', name: 'Consultoría y seguros', professional: 'Consultor', group: 'profesionales', color: Brand.jacaranda, ink: Brand.white, icon: 'trending-up-outline', emoji: 'grafica',
     specialties: [
       sp('Mejora de procesos', 'procesos', 'eficiencia', 'costos', 'indicadores'),
       sp('Finanzas para PyME', 'finanzas', 'flujo', 'crédito', 'precios'),
@@ -77,7 +78,7 @@ export const CATEGORIES: Category[] = [
   },
   // ── Oficios ────────────────────────────────────────────────
   {
-    slug: 'plomeria', name: 'Plomería', professional: 'Plomero', group: 'oficios', color: Brand.alberca, ink: Brand.white, icon: 'water-outline',
+    slug: 'plomeria', name: 'Plomería', professional: 'Plomero', group: 'oficios', color: Brand.alberca, ink: Brand.white, icon: 'water-outline', emoji: 'destapador',
     specialties: [
       sp('Fugas de agua', 'fuga', 'gotea', 'humedad', 'goteo'),
       sp('Calentadores', 'calentador', 'boiler', 'agua caliente'),
@@ -87,7 +88,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'electricidad', name: 'Electricidad', professional: 'Electricista', group: 'oficios', color: '#C98A0B', ink: Brand.white, icon: 'flash-outline',
+    slug: 'electricidad', name: 'Electricidad', professional: 'Electricista', group: 'oficios', color: '#C98A0B', ink: Brand.white, icon: 'flash-outline', emoji: 'foco',
     specialties: [
       sp('Cortos y fallas', 'corto', 'se fue la luz', 'pastilla', 'apagón', 'falla eléctrica'),
       sp('Instalaciones eléctricas', 'instalación eléctrica', 'cableado', 'contactos', 'apagadores'),
@@ -96,7 +97,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'carpinteria', name: 'Carpintería', professional: 'Carpintero', group: 'oficios', color: '#8A5A2B', ink: Brand.white, icon: 'hammer-outline',
+    slug: 'carpinteria', name: 'Carpintería', professional: 'Carpintero', group: 'oficios', color: '#8A5A2B', ink: Brand.white, icon: 'hammer-outline', emoji: 'serrucho',
     specialties: [
       sp('Muebles a medida', 'mueble', 'librero', 'mesa'),
       sp('Closets y cocinas', 'closet', 'cocina integral', 'alacena'),
@@ -105,7 +106,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'climas', name: 'Climas y electrodomésticos', professional: 'Técnico', group: 'oficios', color: '#1B8FA6', ink: Brand.white, icon: 'snow-outline',
+    slug: 'climas', name: 'Climas y electrodomésticos', professional: 'Técnico', group: 'oficios', color: '#1B8FA6', ink: Brand.white, icon: 'snow-outline', emoji: 'copo',
     specialties: [
       sp('Minisplits', 'minisplit', 'aire acondicionado', 'clima'),
       sp('Refrigeradores', 'refrigerador', 'refri', 'no enfría'),
@@ -113,7 +114,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'pintura-y-albanileria', name: 'Pintura y albañilería', professional: 'Maestro de obra', group: 'oficios', color: Brand.nopalDark, ink: Brand.white, icon: 'color-fill-outline',
+    slug: 'pintura-y-albanileria', name: 'Pintura y albañilería', professional: 'Maestro de obra', group: 'oficios', color: Brand.nopalDark, ink: Brand.white, icon: 'color-fill-outline', emoji: 'brocha',
     specialties: [
       sp('Pintura', 'pintar', 'pintura', 'fachada'),
       sp('Impermeabilización', 'impermeabilizar', 'goteras', 'techo'),
@@ -121,7 +122,7 @@ export const CATEGORIES: Category[] = [
     ],
   },
   {
-    slug: 'cerrajeria', name: 'Cerrajería', professional: 'Cerrajero', group: 'oficios', color: Brand.inkSoft, ink: Brand.white, icon: 'key-outline',
+    slug: 'cerrajeria', name: 'Cerrajería', professional: 'Cerrajero', group: 'oficios', color: Brand.inkSoft, ink: Brand.white, icon: 'key-outline', emoji: 'llave',
     specialties: [
       sp('Aperturas', 'me quedé afuera', 'abrir puerta', 'llaves adentro'),
       sp('Cambio de chapas', 'chapa', 'cerradura', 'combinación'),
@@ -129,6 +130,33 @@ export const CATEGORIES: Category[] = [
     ],
   },
 ];
+
+/** Dibujo de cada especialidad (lo ve quien no lee) */
+const SPECIALTY_EMOJI: Record<string, EmojiName> = {
+  Familiar: 'familia', Laboral: 'portafolio', 'Mercantil y corporativo': 'edificio', Penal: 'candado', 'Civil e inmobiliario': 'casa',
+  Migratorio: 'mundo', Fiscal: 'gobierno', 'Declaración anual': 'recibo', 'RESICO y personas físicas': 'laptop',
+  'Contabilidad de empresas': 'grafica', 'Nómina e IMSS': 'personas', 'Defensa ante el SAT': 'escudo', Facturación: 'recibo',
+  Escrituras: 'casa', Testamentos: 'pergamino', 'Poderes notariales': 'nota', 'Traducción certificada': 'globo_texto', Gestoría: 'portapapeles',
+  'Terapia individual': 'cerebro', 'Terapia de pareja': 'anillo', 'Ansiedad y estrés': 'pensando', Nutrición: 'regadera', Fisioterapia: 'hospital',
+  'Proyecto arquitectónico': 'escuadra', 'Licencias de construcción': 'portapapeles', Remodelación: 'ladrillos', Avalúos: 'dinero', 'Cálculo estructural': 'construccion',
+  'Mejora de procesos': 'grafica', 'Finanzas para PyME': 'dinero', 'Marketing digital': 'megafono', 'Seguros de gastos médicos': 'hospital', 'Seguros de vida y retiro': 'escudo',
+  'Fugas de agua': 'gota', Calentadores: 'regadera', 'Destapes y drenaje': 'destapador', 'Tinacos y cisternas': 'gota', 'Instalación hidráulica': 'llave_inglesa',
+  'Cortos y fallas': 'enchufe', 'Instalaciones eléctricas': 'foco', 'Paneles solares': 'foco', 'Cámaras y seguridad': 'camara',
+  'Muebles a medida': 'serrucho', 'Closets y cocinas': 'puerta', 'Puertas y ventanas': 'puerta', 'Reparación de muebles': 'herramientas',
+  Minisplits: 'copo', Refrigeradores: 'copo', 'Lavadoras y secadoras': 'herramientas',
+  Pintura: 'brocha', Impermeabilización: 'paraguas', Albañilería: 'ladrillos',
+  Aperturas: 'puerta', 'Cambio de chapas': 'candado', 'Llaves de auto': 'llave',
+};
+for (const c of CATEGORIES) for (const s of c.specialties) s.emoji = SPECIALTY_EMOJI[s.name] ?? c.emoji;
+
+/** Dibujo de una especialidad por su nombre (o el de su categoría) */
+export function specialtyEmoji(name: string): EmojiName {
+  for (const c of CATEGORIES) {
+    const s = c.specialties.find((x) => x.name === name);
+    if (s) return s.emoji ?? c.emoji;
+  }
+  return 'estrella';
+}
 
 const r = (id: string, author: string, rating: number, body: string, dateLabel: string, extra: Partial<Review> = {}): Review => ({
   id,

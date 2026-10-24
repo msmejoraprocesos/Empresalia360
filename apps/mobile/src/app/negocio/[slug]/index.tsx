@@ -5,13 +5,15 @@ import { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { consultLabel, ProAvatar } from '@/components/business-card';
+import { ATTEND_EMOJI, consultLabel, ProAvatar, Tag } from '@/components/business-card';
+import { Emoji } from '@/components/emoji';
+import { SpeakButton } from '@/components/speak-button';
 import { BusinessMap } from '@/components/business-map';
 import { PostCard } from '@/components/community-feed';
 import { Pattern } from '@/components/pattern-background';
 import { BottomBar, Button, Card, Chip, EmptyState, IconCircle, RoundIconButton, Segmented, Stars } from '@/components/ui';
 import { Brand, Radius, ShadowStrong } from '@/constants/theme';
-import { ATTEND_ICON, ATTEND_LABEL, categoryBySlug, distanceTo, getBusiness, primaryAction } from '@/data';
+import { ATTEND_LABEL, categoryBySlug, distanceTo, getBusiness, primaryAction, specialtyEmoji } from '@/data';
 import { markSource, track, useBusinessScreen } from '@/lib/analytics';
 import { distance, money } from '@/lib/format';
 import { useApp } from '@/store/app';
@@ -44,7 +46,13 @@ export default function PerfilProfesional() {
       <Pattern kind={cat?.group ?? 'profesionales'} />
       <ScrollView contentContainerStyle={{ paddingBottom: 150 }}>
         <View style={[styles.cover, { backgroundColor: coverColor, paddingTop: insets.top + 10 }]}>
-          {b.cover ? <Image source={{ uri: b.cover }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityLabel="Portada" /> : null}
+          {b.cover ? (
+            <Image source={{ uri: b.cover }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityLabel="Portada" />
+          ) : cat ? (
+            <View style={styles.coverArt} pointerEvents="none">
+              <Emoji name={cat.emoji} size={110} />
+            </View>
+          ) : null}
           <View style={styles.coverRow}>
             <RoundIconButton icon="chevron-back" label="Volver" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -72,7 +80,7 @@ export default function PerfilProfesional() {
 
         <Card strong style={styles.info}>
           <View style={styles.idRow}>
-            <ProAvatar business={b} size={72} />
+            <ProAvatar business={b} size={88} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.name}>{b.name}</Text>
               <Text style={styles.sub}>
@@ -82,6 +90,11 @@ export default function PerfilProfesional() {
                 <Stars rating={b.rating} size={14} />
                 <Text style={{ fontWeight: '800', color: Brand.ink }}>{b.rating.toFixed(1)}</Text>
                 <Text style={styles.sub}>({b.ratingCount})</Text>
+              </View>
+              <View style={{ marginTop: 8 }}>
+                <SpeakButton
+                  text={`${b.name}. ${b.profession}. ${b.yearsExp} años de experiencia. Calificación ${b.rating.toFixed(1)} de 5, con ${b.ratingCount} opiniones. Ayuda en: ${b.specialties.join(', ')}. Atiende ${b.attends.map((a) => ATTEND_LABEL[a].toLowerCase()).join(' y ')}. ${consult ?? ''}. Para agendar, toca el botón azul de abajo. Para mandar mensaje, toca el botón verde.`}
+                />
               </View>
             </View>
           </View>
@@ -103,14 +116,17 @@ export default function PerfilProfesional() {
 
           <View style={styles.chips}>
             {b.specialties.map((s) => (
-              <Chip key={s} label={s} color={Brand.chileSoft} ink={Brand.chileDark} />
+              <View key={s} style={styles.spec}>
+                <Emoji name={specialtyEmoji(s)} size={20} />
+                <Text style={styles.specText}>{s}</Text>
+              </View>
             ))}
           </View>
 
           <View style={styles.attends}>
             {b.attends.map((a) => (
               <View key={a} style={styles.attend}>
-                <Ionicons name={ATTEND_ICON[a]} size={16} color={Brand.chile} />
+                <Emoji name={ATTEND_EMOJI[a]} size={22} />
                 <Text style={styles.attendText}>{ATTEND_LABEL[a]}</Text>
               </View>
             ))}
@@ -118,12 +134,12 @@ export default function PerfilProfesional() {
 
           {b.verified || b.responseTime || consult || b.urgent24 || b.warranty || b.loyalty ? (
             <View style={styles.trust}>
-              {b.verified ? <Chip label={b.license ? 'Cédula verificada' : 'Identidad verificada'} color={Brand.nopalSoft} ink={Brand.nopalDark} icon="shield-checkmark" /> : null}
-              {b.responseTime ? <Chip label={b.responseTime} icon="time-outline" /> : null}
-              {consult ? <Chip label={consult} color={Brand.mangoSoft} ink="#5A3E00" icon="cash-outline" /> : null}
-              {b.urgent24 ? <Chip label="Urgencias 24 h" color="#FDE2E2" ink="#A32020" icon="flash" /> : null}
-              {b.warranty ? <Chip label={b.warranty} color={Brand.albercaSoft} ink="#1757B8" icon="shield-outline" /> : null}
-              {b.loyalty ? <Chip label={`Lealtad: ${b.loyalty.reward}`} color={Brand.jacarandaSoft} ink={Brand.jacaranda} icon="gift-outline" /> : null}
+              {b.verified ? <Tag emoji="palomita" text={b.license ? 'Cédula verificada' : 'Identidad verificada'} bg={Brand.nopalSoft} fg={Brand.nopalDark} /> : null}
+              {b.responseTime ? <Tag emoji="reloj" text={b.responseTime} bg={Brand.line} fg={Brand.ink} /> : null}
+              {consult ? <Tag emoji="billete" text={consult} bg={Brand.mangoSoft} fg="#5A3E00" /> : null}
+              {b.urgent24 ? <Tag emoji="sirena" text="Urgencias 24 h" bg="#FDE2E2" fg="#A32020" /> : null}
+              {b.warranty ? <Tag emoji="escudo" text={b.warranty} bg={Brand.albercaSoft} fg="#1757B8" /> : null}
+              {b.loyalty ? <Tag emoji="regalo" text={b.loyalty.reward} bg={Brand.jacarandaSoft} fg={Brand.jacaranda} /> : null}
             </View>
           ) : null}
         </Card>
@@ -303,18 +319,30 @@ export default function PerfilProfesional() {
 
       <BottomBar>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <RoundIconButton
-            icon="logo-whatsapp"
-            label="Escribir por WhatsApp"
-            size={54}
-            bg={Brand.nopalSoft}
-            color={Brand.nopalDark}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Llamar"
+            onPress={() => {
+              track(b, 'contacto', { screen: 'llamada' });
+              Linking.openURL(`tel:+${b.phone}`);
+            }}
+            style={[styles.bigBtn, { backgroundColor: Brand.tortilla }]}>
+            <Emoji name="telefono" size={26} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Escribir por WhatsApp"
             onPress={() => {
               track(b, 'contacto', { screen: 'whatsapp' });
               Linking.openURL(`https://wa.me/${b.phone}?text=${encodeURIComponent('Hola, vi tu perfil en Expertalia 360')}`);
             }}
-          />
-          <Button label={action.label} style={{ flex: 1 }} onPress={goPrimary} />
+            style={[styles.bigBtn, { backgroundColor: '#25D366' }]}>
+            <Emoji name="globo_texto" size={26} />
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={goPrimary} style={[styles.bigBtn, { flex: 1, backgroundColor: Brand.chile, flexDirection: 'row', gap: 8 }]}>
+            <Emoji name={action.module === 'reservar' ? 'calendario' : 'nota'} size={26} />
+            <Text style={{ color: Brand.white, fontWeight: '800', fontSize: 17 }}>{action.label}</Text>
+          </Pressable>
         </View>
         {b.modules.includes('cotizar') && action.module !== 'cotizar' ? (
           <Button label="Pedir cotización" variant="outline" small onPress={() => router.push(`/negocio/${b.slug}/cotizar`)} />
@@ -337,6 +365,7 @@ function InfoRow({ icon, label, value }: { icon: 'ribbon-outline' | 'school-outl
 }
 
 const styles = StyleSheet.create({
+  coverArt: { position: 'absolute', right: 24, bottom: 34, opacity: 0.35, transform: [{ rotate: '-12deg' }] },
   cover: { height: 150, paddingHorizontal: 16, overflow: 'hidden' },
   coverRow: { flexDirection: 'row', justifyContent: 'space-between' },
   info: { marginHorizontal: 16, marginTop: -54, borderRadius: Radius.lg, gap: 14, ...ShadowStrong },
@@ -360,6 +389,9 @@ const styles = StyleSheet.create({
   divider: { borderBottomWidth: 1, borderBottomColor: Brand.line },
   itemName: { fontSize: 15, fontWeight: '700', color: Brand.ink },
   price: { fontSize: 15, fontWeight: '800', color: Brand.ink },
+  spec: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Brand.chileSoft },
+  specText: { fontSize: 13, fontWeight: '700', color: Brand.chileDark },
+  bigBtn: { height: 56, minWidth: 56, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoLabel: { fontSize: 11, fontWeight: '700', color: Brand.inkSoft, textTransform: 'uppercase', letterSpacing: 0.3 },
   infoText: { color: Brand.ink, fontSize: 14, marginTop: 1 },

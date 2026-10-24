@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Emoji } from '@/components/emoji';
+import { SpeakButton } from '@/components/speak-button';
 import { BottomBar, Button, Header } from '@/components/ui';
 import { Brand, Radius, Shadow, ShadowStrong } from '@/constants/theme';
 import type { IconName, Role } from '@/data/types';
@@ -24,6 +26,9 @@ export default function ElegirPerfil() {
         <Header extraBottom={44}>
           <Text style={styles.title}>¿Cómo usarás Expertalia 360?</Text>
           <Text style={styles.sub}>Puedes cambiarlo después en tu perfil</Text>
+          <View style={{ paddingHorizontal: 8, marginTop: 10 }}>
+            <SpeakButton dark text="¿Cómo usarás Expertalia? Toca Busco un experto si necesitas ayuda. Toca Soy profesional u oficio si ofreces tus servicios." />
+          </View>
         </Header>
         <View style={{ padding: 20, marginTop: -40, gap: 12 }} accessibilityRole="radiogroup">
         {ROLES.map((r) => {
@@ -35,8 +40,8 @@ export default function ElegirPerfil() {
               accessibilityState={{ checked: on }}
               onPress={() => setRole(r.id)}
               style={[styles.option, on ? [ShadowStrong, { borderColor: r.color }] : Shadow]}>
-              <View style={[styles.icon, { backgroundColor: on ? r.color : r.soft }]}>
-                <Ionicons name={r.icon} size={32} color={on ? Brand.white : r.ink} />
+              <View style={[styles.icon, { backgroundColor: on ? r.soft : Brand.tortilla }]}>
+                <Emoji name={r.id === 'vecino' ? 'lupa' : 'trabajador'} size={42} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.optionTitle}>{r.label}</Text>
@@ -76,7 +81,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: Brand.white,
   },
-  icon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  icon: { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   optionTitle: { fontSize: 18, fontWeight: '800', color: Brand.ink },
   optionSub: { fontSize: 13, color: Brand.inkSoft, marginTop: 3 },
   check: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: Brand.line, alignItems: 'center', justifyContent: 'center' },

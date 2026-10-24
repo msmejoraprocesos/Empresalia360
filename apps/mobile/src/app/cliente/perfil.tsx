@@ -82,6 +82,7 @@ export default function Perfil() {
             : isSupabaseConfigured
               ? `datos de ejemplo (Supabase: ${catalogStatus.error ?? 'sin respuesta'})`
               : 'datos de ejemplo'}
+          {'\n'}Dibujos: Twemoji (CC BY 4.0) · Caras: Personas de DiceBear por Draftbot (CC BY 4.0)
         </Text>
       </ScrollView>
     </View>

@@ -3,7 +3,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { BusinessCard } from '@/components/business-card';
+import { BusinessCard, ATTEND_EMOJI } from '@/components/business-card';
+import { Emoji } from '@/components/emoji';
+import { SpeakButton } from '@/components/speak-button';
+import type { EmojiName } from '@/constants/emoji';
+import { useVoiceSearch } from '@/lib/voice';
 import { LookingForSwitch } from '@/components/looking-for';
 import { PatternView } from '@/components/pattern-background';
 import { EmptyState, Header, RoundIconButton } from '@/components/ui';
@@ -12,10 +16,10 @@ import { ATTEND_LABEL, CATEGORIES, categoryBySlug, searchProfessionals, specialt
 import type { Attend } from '@/data/types';
 import { useApp } from '@/store/app';
 
-function Pill({ label, on, onPress, icon }: { label: string; on: boolean; onPress: () => void; icon?: 'checkmark' }) {
+function Pill({ label, on, onPress, icon, emoji }: { label: string; on: boolean; onPress: () => void; icon?: 'checkmark'; emoji?: EmojiName }) {
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ selected: on }} onPress={onPress} style={[styles.pill, on && styles.pillOn]}>
-      {on && icon ? <Ionicons name={icon} size={14} color={Brand.white} /> : null}
+      {emoji ? <Emoji name={emoji} size={18} /> : on && icon ? <Ionicons name={icon} size={14} color={Brand.white} /> : null}
       <Text style={[styles.pillText, on && { color: Brand.white }]}>{label}</Text>
     </Pressable>
   );
@@ -50,6 +54,10 @@ export default function Explorar() {
   }
 
   const lf = state.lookingFor;
+  const voice = useVoiceSearch((t) => {
+    setQ(t);
+    setSpecialty(undefined);
+  });
   const suggestions = specialtiesFor(q).filter((s) => lf === 'todo' || s.category.group === lf);
   const autoSpecialty = !specialty && suggestions.length === 1 ? suggestions[0].specialty : undefined;
   const results = searchProfessionals(specialty ? '' : q, { specialty, attend, verified, freeConsult, sort }).filter((b) => !urgent || b.urgent24).filter((b) => lf === 'todo' || categoryBySlug(b.categorySlug)?.group === lf);
@@ -62,7 +70,7 @@ export default function Explorar() {
         back={false}
         right={<RoundIconButton icon="map-outline" label="Ver en el mapa" bg="rgba(0,0,0,0.16)" color={Brand.white} onPress={() => router.push('/mapa')} />}>
         <View style={styles.search}>
-          <Ionicons name="search" size={20} color={Brand.inkSoft} />
+          <Emoji name="lupa" size={20} />
           <TextInput
             value={q}
             onChangeText={(t) => {
@@ -84,7 +92,11 @@ export default function Explorar() {
               hitSlop={8}>
               <Ionicons name="close-circle" size={20} color={Brand.inkMuted} />
             </Pressable>
-          ) : null}
+          ) : (
+            <Pressable onPress={voice.listening ? voice.stop : voice.start} accessibilityRole="button" accessibilityLabel="Buscar hablando" style={[styles.mic, voice.listening && { backgroundColor: '#FDE2E2' }]}>
+              <Emoji name="microfono" size={22} />
+            </Pressable>
+          )}
         </View>
       </Header>
 
@@ -98,6 +110,7 @@ export default function Explorar() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
               {suggestions.map((s) => (
                 <Pill
+                  emoji={s.category.specialties.find((x) => x.name === s.specialty)?.emoji ?? s.category.emoji}
                   key={s.category.slug + s.specialty}
                   label={`${s.specialty} · ${s.category.name}`}
                   on={specialty === s.specialty}
@@ -115,8 +128,10 @@ export default function Explorar() {
             <View style={styles.catWrap}>
               {CATEGORIES.filter((c) => lf === 'todo' || c.group === lf).map((c) => (
                 <Pressable key={c.slug} accessibilityRole="button" onPress={() => router.push(`/categoria/${c.slug}`)} style={styles.cat}>
-                  <Ionicons name={c.icon} size={16} color={Brand.chile} />
-                  <Text style={styles.catText}>{c.name}</Text>
+                  <Emoji name={c.emoji} size={34} />
+                  <Text style={styles.catText} numberOfLines={2}>
+                    {c.name}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -125,19 +140,32 @@ export default function Explorar() {
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
           {(['despacho', 'en_linea', 'domicilio'] as Attend[]).map((a) => (
-            <Pill key={a} label={ATTEND_LABEL[a]} on={attend === a} icon="checkmark" onPress={() => setAttend(attend === a ? undefined : a)} />
+            <Pill key={a} label={ATTEND_LABEL[a]} emoji={ATTEND_EMOJI[a]} on={attend === a} onPress={() => setAttend(attend === a ? undefined : a)} />
           ))}
-          <Pill label="Urgencias 24 h" on={urgent} icon="checkmark" onPress={() => setUrgent(!urgent)} />
-          <Pill label="Verificados" on={verified} icon="checkmark" onPress={() => setVerified(!verified)} />
-          <Pill label="Primera consulta sin costo" on={freeConsult} icon="checkmark" onPress={() => setFreeConsult(!freeConsult)} />
+          <Pill label="Urgencias 24 h" emoji="sirena" on={urgent} onPress={() => setUrgent(!urgent)} />
+          <Pill label="Verificados" emoji="palomita" on={verified} onPress={() => setVerified(!verified)} />
+          <Pill label="Consulta gratis" emoji="billete" on={freeConsult} onPress={() => setFreeConsult(!freeConsult)} />
         </ScrollView>
 
         <View style={{ paddingHorizontal: 16, gap: 10 }}>
           <View style={styles.resultsHead}>
-            <Text style={styles.count}>
-              {results.length} {results.length === 1 ? 'experto' : 'expertos'}
-              {specialty ? ` en ${specialty}` : ''}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={[styles.count, { flex: 1 }]}>
+                {results.length} {results.length === 1 ? 'experto' : 'expertos'}
+                {specialty ? ` en ${specialty}` : ''}
+              </Text>
+              {results.length ? (
+                <SpeakButton
+                  compact
+                  text={`Encontré ${results.length} ${results.length === 1 ? 'experto' : 'expertos'}. ${results
+                    .slice(0, 3)
+                    .map((b) => `${b.name}, ${b.profession}, calificación ${b.rating.toFixed(1)}`)
+                    .join('. ')}.`}
+                />
+              ) : null}
+            </View>
+            {voice.listening ? <Text style={{ color: Brand.chile, fontWeight: '700' }}>Te escucho… di qué necesitas</Text> : null}
+            {voice.error ? <Text style={{ color: Brand.inkSoft }}>{voice.error}</Text> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
               {SORTS.map((s) => (
                 <Pressable key={s.v} onPress={() => setSort(s.v)} accessibilityRole="button" accessibilityState={{ selected: sort === s.v }}>
@@ -152,7 +180,7 @@ export default function Explorar() {
             return (
               <PatternView key={g} kind={g} style={styles.segment}>
                 <View style={styles.segHead}>
-                  <Ionicons name={g === 'profesionales' ? 'briefcase' : 'hammer'} size={16} color={g === 'profesionales' ? Brand.chile : '#8A5A2B'} />
+                  <Emoji name={g === 'profesionales' ? 'portafolio' : 'caja_herramientas'} size={22} />
                   <Text style={[styles.segTitle, g === 'oficios' && { color: '#5E3C1A' }]}>
                     {g === 'profesionales' ? 'Profesionales' : 'Oficios'} · {part.length}
                   </Text>
@@ -182,8 +210,9 @@ const styles = StyleSheet.create({
   pillOn: { backgroundColor: Brand.chile, borderColor: Brand.chile },
   pillText: { fontSize: 13, fontWeight: '600', color: Brand.ink },
   catWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  cat: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: Radius.md, backgroundColor: Brand.white, borderWidth: 1, borderColor: Brand.line },
-  catText: { fontSize: 13, fontWeight: '700', color: Brand.ink },
+  cat: { width: '31%', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 4, borderRadius: Radius.md, backgroundColor: Brand.white, borderWidth: 1, borderColor: Brand.line },
+  catText: { fontSize: 12, fontWeight: '700', color: Brand.ink, textAlign: 'center' },
+  mic: { width: 40, height: 40, borderRadius: 20, backgroundColor: Brand.mangoSoft, alignItems: 'center', justifyContent: 'center', marginRight: -10 },
   resultsHead: { gap: 6 },
   count: { fontSize: 18, fontWeight: '800', color: Brand.ink },
   segment: { borderRadius: 22, padding: 10, borderWidth: 1, borderColor: Brand.line },

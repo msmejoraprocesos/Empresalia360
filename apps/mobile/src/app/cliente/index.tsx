@@ -1,53 +1,57 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BusinessCard } from '@/components/business-card';
 import { PostCard } from '@/components/community-feed';
+import { Emoji } from '@/components/emoji';
 import { LookingForSwitch } from '@/components/looking-for';
 import { PatternView } from '@/components/pattern-background';
-import { RoundIconButton, SectionTitle } from '@/components/ui';
+import { SpeakButton } from '@/components/speak-button';
+import { SectionTitle } from '@/components/ui';
+import { AVATARS } from '@/constants/avatars';
+import type { EmojiName } from '@/constants/emoji';
 import { Brand, Radius, Shadow, TabBarSpace } from '@/constants/theme';
 import { CATEGORIES, getBusiness, PROMOTIONS, searchProfessionals } from '@/data';
-import type { Category, IconName } from '@/data/types';
+import type { Category } from '@/data/types';
 import { markSource } from '@/lib/analytics';
 import { greeting } from '@/lib/format';
+import { useVoiceSearch } from '@/lib/voice';
 import { useApp } from '@/store/app';
 
-/** Problemas frecuentes: lo que la gente escribe, no el nombre técnico de la especialidad. */
-const FREQUENT: { label: string; q: string; g: 'profesionales' | 'oficios' }[] = [
-  { label: 'Me despidieron', q: 'despido', g: 'profesionales' },
-  { label: 'Tengo una fuga', q: 'fuga', g: 'oficios' },
-  { label: 'Divorcio', q: 'divorcio', g: 'profesionales' },
-  { label: 'Se fue la luz', q: 'corto', g: 'oficios' },
-  { label: 'Declaración anual', q: 'declaración anual', g: 'profesionales' },
-  { label: 'Me quedé afuera', q: 'abrir puerta', g: 'oficios' },
-  { label: 'Requerimiento del SAT', q: 'requerimiento', g: 'profesionales' },
-  { label: 'Goteras', q: 'goteras', g: 'oficios' },
-  { label: 'Testamento', q: 'testamento', g: 'profesionales' },
-  { label: 'Minisplit', q: 'minisplit', g: 'oficios' },
+/** Problemas frecuentes, con dibujo: lo que la gente dice, no el nombre técnico. */
+const FREQUENT: { label: string; q: string; g: 'profesionales' | 'oficios'; emoji: EmojiName }[] = [
+  { label: 'Me despidieron', q: 'despido', g: 'profesionales', emoji: 'portafolio' },
+  { label: 'Tengo una fuga', q: 'fuga', g: 'oficios', emoji: 'gota' },
+  { label: 'Divorcio', q: 'divorcio', g: 'profesionales', emoji: 'corazon_roto' },
+  { label: 'No hay luz', q: 'corto', g: 'oficios', emoji: 'enchufe' },
+  { label: 'Impuestos', q: 'declaración anual', g: 'profesionales', emoji: 'recibo' },
+  { label: 'Me quedé afuera', q: 'abrir puerta', g: 'oficios', emoji: 'puerta' },
+  { label: 'Carta del SAT', q: 'requerimiento', g: 'profesionales', emoji: 'gobierno' },
+  { label: 'Goteras', q: 'goteras', g: 'oficios', emoji: 'paraguas' },
+  { label: 'Testamento', q: 'testamento', g: 'profesionales', emoji: 'pergamino' },
+  { label: 'Clima', q: 'minisplit', g: 'oficios', emoji: 'copo' },
 ];
 
-const QUICK: { label: string; icon: IconName; href: '/mapa' | '/lealtad' | '/qr' | '/cliente/comunidad'; color: string }[] = [
-  { label: 'Mapa', icon: 'map', href: '/mapa', color: Brand.alberca },
-  { label: 'Preguntar', icon: 'help-buoy', href: '/cliente/comunidad', color: Brand.jacaranda },
-  { label: 'Mis puntos', icon: 'gift', href: '/lealtad', color: Brand.nopal },
-  { label: 'Mi QR', icon: 'qr-code', href: '/qr', color: Brand.ink },
+const QUICK: { label: string; emoji: EmojiName; href: '/mapa' | '/lealtad' | '/qr' | '/cliente/comunidad' }[] = [
+  { label: 'Mapa', emoji: 'mapa', href: '/mapa' },
+  { label: 'Preguntar', emoji: 'mano_arriba', href: '/cliente/comunidad' },
+  { label: 'Regalos', emoji: 'regalo', href: '/lealtad' },
+  { label: 'Mi QR', emoji: 'celular_flecha', href: '/qr' },
 ];
 
-const PROMO_STYLE: Record<string, { bg: string; fg: string; tag: string }> = {
-  vence: { bg: Brand.mango, fg: Brand.ink, tag: 'VENCE PRONTO' },
-  cumpleanos: { bg: Brand.bugambilia, fg: Brand.white, tag: 'TU CUMPLEAÑOS' },
-  global: { bg: Brand.nopal, fg: Brand.white, tag: 'PARA TODOS' },
-  negocio: { bg: Brand.alberca, fg: Brand.white, tag: 'PROMOCIÓN' },
+const PROMO_STYLE: Record<string, { bg: string; fg: string; emoji: EmojiName }> = {
+  vence: { bg: Brand.mango, fg: Brand.ink, emoji: 'reloj' },
+  cumpleanos: { bg: Brand.bugambilia, fg: Brand.white, emoji: 'fiesta' },
+  global: { bg: Brand.nopal, fg: Brand.white, emoji: 'etiqueta' },
+  negocio: { bg: Brand.alberca, fg: Brand.white, emoji: 'regalo' },
 };
 
 function CategoryTile({ c }: { c: Category }) {
   const router = useRouter();
-  const light = c.color === Brand.line || c.color === Brand.mango;
+  const soft = c.color === Brand.line ? Brand.line : `${c.color}22`;
   return (
     <Pressable
       accessibilityRole="button"
@@ -56,9 +60,9 @@ function CategoryTile({ c }: { c: Category }) {
         markSource('categoria');
         router.push(`/categoria/${c.slug}`);
       }}
-      style={({ pressed }) => [styles.tile, pressed && { opacity: 0.85 }]}>
-      <View style={[styles.tileIcon, { backgroundColor: c.color }]}>
-        <Ionicons name={c.icon} size={24} color={light ? Brand.ink : c.ink === Brand.mango ? Brand.mango : Brand.white} />
+      style={({ pressed }) => [styles.tile, pressed && { transform: [{ scale: 0.96 }] }]}>
+      <View style={[styles.tileIcon, { backgroundColor: soft, borderColor: c.color === Brand.line ? Brand.line : `${c.color}55` }]}>
+        <Emoji name={c.emoji} size={44} />
       </View>
       <Text style={styles.tileLabel} numberOfLines={2}>
         {c.name}
@@ -78,6 +82,10 @@ export default function Inicio() {
     markSource('buscar');
     router.push({ pathname: '/cliente/explorar', params: { q: text.trim() } });
   };
+  const voice = useVoiceSearch((t) => {
+    setQ(t);
+    go(t);
+  });
 
   const pros = CATEGORIES.filter((c) => c.group === 'profesionales');
   const trades = CATEGORIES.filter((c) => c.group === 'oficios');
@@ -95,74 +103,121 @@ export default function Inicio() {
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
       <ScrollView contentContainerStyle={{ paddingBottom: TabBarSpace }} keyboardShouldPersistTaps="handled">
-        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
           <View style={styles.headerRow}>
+            <Image source={AVATARS.usuario} style={styles.me} contentFit="cover" accessibilityLabel="Tu foto" />
             <View style={{ flex: 1 }}>
               <Text style={styles.hello}>
                 {greeting()}, {state.userName}
               </Text>
-              <Text style={styles.headline}>¿Qué necesitas resolver?</Text>
+              <Text style={styles.headline}>¿Qué necesitas?</Text>
             </View>
-            <RoundIconButton icon="location-outline" label="Ver en el mapa" bg={Brand.chileDark} color={Brand.white} onPress={() => router.push('/mapa')} />
+            <SpeakButton
+              dark
+              compact
+              text={`${greeting()}, ${state.userName}. ¿Qué necesitas? Toca un dibujo para buscar un experto, o toca el micrófono y dilo con tu voz.`}
+            />
           </View>
           <View style={{ marginTop: 14 }}>
             <LookingForSwitch dark />
           </View>
           <View style={styles.search}>
-            <Ionicons name="search" size={20} color={Brand.inkSoft} />
+            <Emoji name="lupa" size={22} />
             <TextInput
               value={q}
               onChangeText={setQ}
               onSubmitEditing={() => go(q)}
               returnKeyType="search"
-              placeholder={lf === 'oficios' ? 'Ej. fuga de agua, corto, cerradura' : lf === 'profesionales' ? 'Ej. despido, divorcio, declaración' : 'Ej. despido, fuga de agua, divorcio'}
+              placeholder={lf === 'oficios' ? 'Fuga, luz, cerradura…' : lf === 'profesionales' ? 'Despido, divorcio, impuestos…' : 'Escribe o habla'}
               placeholderTextColor={Brand.inkMuted}
               style={styles.searchInput}
-              accessibilityLabel="Describe tu problema o busca un profesional"
+              accessibilityLabel="Describe tu problema o busca un experto"
             />
             {q ? (
               <Pressable onPress={() => go(q)} accessibilityRole="button" style={styles.searchBtn}>
                 <Text style={styles.searchBtnText}>Buscar</Text>
               </Pressable>
-            ) : null}
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 14 }}>
-            {freq.map((f) => (
-              <Pressable key={f.q} accessibilityRole="button" onPress={() => go(f.q)} style={styles.freq}>
-                <Text style={styles.freqText}>{f.label}</Text>
+            ) : (
+              <Pressable
+                onPress={voice.listening ? voice.stop : voice.start}
+                accessibilityRole="button"
+                accessibilityLabel="Buscar hablando"
+                style={[styles.mic, voice.listening && { backgroundColor: '#FDE2E2' }]}>
+                <Emoji name="microfono" size={24} />
               </Pressable>
-            ))}
-          </ScrollView>
+            )}
+          </View>
+          {voice.listening ? <Text style={styles.voiceHint}>Te escucho… di qué necesitas</Text> : null}
+          {voice.error ? <Text style={styles.voiceHint}>{voice.error}</Text> : null}
         </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16, paddingTop: 16 }}>
+          {freq.map((f) => (
+            <Pressable key={f.q} accessibilityRole="button" accessibilityLabel={f.label} onPress={() => go(f.q)} style={({ pressed }) => [styles.problem, Shadow, pressed && { transform: [{ scale: 0.96 }] }]}>
+              <Emoji name={f.emoji} size={36} />
+              <Text style={styles.problemText} numberOfLines={2}>
+                {f.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
 
         <View style={{ paddingHorizontal: 16 }}>
           {upcoming ? (
             <Pressable onPress={() => router.push('/cliente/pedidos')} accessibilityRole="button" style={[styles.upcoming, Shadow]}>
-              <View style={styles.upIcon}>
-                <Ionicons name="calendar" size={22} color={Brand.white} />
-              </View>
+              <Emoji name="calendario" size={40} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Tu próxima cita</Text>
                 <Text style={styles.cardSub} numberOfLines={1}>
                   {upcoming.businessName} · {upcoming.detail}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={Brand.inkMuted} />
+              <SpeakButton compact text={`Tu próxima cita es con ${upcoming.businessName}. ${upcoming.detail}.`} />
             </Pressable>
           ) : null}
 
           <View style={styles.quick}>
-            {QUICK.map((q) => (
-              <Pressable key={q.label} accessibilityRole="button" onPress={() => router.push(q.href)} style={styles.quickItem}>
-                <View style={[styles.quickIcon, { backgroundColor: q.color }]}>
-                  <Ionicons name={q.icon} size={20} color={Brand.white} />
+            {QUICK.map((qk) => (
+              <Pressable key={qk.label} accessibilityRole="button" onPress={() => router.push(qk.href)} style={({ pressed }) => [styles.quickItem, pressed && { opacity: 0.7 }]}>
+                <View style={styles.quickIcon}>
+                  <Emoji name={qk.emoji} size={30} />
                 </View>
-                <Text style={styles.quickLabel}>{q.label}</Text>
+                <Text style={styles.quickLabel}>{qk.label}</Text>
               </Pressable>
             ))}
           </View>
 
-          <SectionTitle title="Promociones de expertos" action="Mis cupones" onAction={() => router.push('/lealtad')} />
+          {lf !== 'oficios' ? (
+            <PatternView kind="profesionales" style={styles.segment}>
+              <View style={styles.segHead}>
+                <Emoji name="portafolio" size={26} />
+                <Text style={styles.segTitle}>Profesionales</Text>
+                <SpeakButton compact text={`Profesionales: ${pros.map((c) => c.name).join(', ')}.`} />
+              </View>
+              <View style={styles.grid}>
+                {pros.map((c) => (
+                  <CategoryTile key={c.slug} c={c} />
+                ))}
+              </View>
+            </PatternView>
+          ) : null}
+
+          {lf !== 'profesionales' ? (
+            <PatternView kind="oficios" style={styles.segment}>
+              <View style={styles.segHead}>
+                <Emoji name="caja_herramientas" size={26} />
+                <Text style={[styles.segTitle, { color: '#5E3C1A' }]}>Oficios</Text>
+                <SpeakButton compact text={`Oficios: ${trades.map((c) => c.name).join(', ')}.`} />
+              </View>
+              <View style={styles.grid}>
+                {trades.map((c) => (
+                  <CategoryTile key={c.slug} c={c} />
+                ))}
+              </View>
+            </PatternView>
+          ) : null}
+
+          <SectionTitle title="Promociones" action="Mis regalos" onAction={() => router.push('/lealtad')} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
           {PROMOTIONS.filter((p) => !p.businessSlug || inGroup(getBusiness(p.businessSlug)?.categorySlug ?? '')).map((p) => {
@@ -178,8 +233,10 @@ export default function Inicio() {
                 }}
                 style={[styles.promo, { backgroundColor: st.bg }, p.photo ? { paddingTop: 0, overflow: 'hidden' } : null]}>
                 {p.photo ? <Image source={{ uri: p.photo }} style={styles.promoPhoto} contentFit="cover" accessibilityLabel={p.title} /> : null}
-                <Text style={[styles.promoTag, { color: st.fg }]}>{st.tag}</Text>
-                <Text style={[styles.promoBadge, { color: st.fg }]}>{p.badge}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={[styles.promoBadge, { color: st.fg }]}>{p.badge}</Text>
+                  {p.photo ? null : <Emoji name={st.emoji} size={40} />}
+                </View>
                 <Text style={[styles.promoTitle, { color: st.fg }]} numberOfLines={1}>
                   {p.title}
                 </Text>
@@ -190,39 +247,10 @@ export default function Inicio() {
             );
           })}
         </ScrollView>
+
         <View style={{ paddingHorizontal: 16 }}>
-          {lf !== 'oficios' ? (
-          <PatternView kind="profesionales" style={styles.segment}>
-            <View style={styles.segHead}>
-              <Ionicons name="briefcase" size={18} color={Brand.chile} />
-              <Text style={styles.segTitle}>Profesionales</Text>
-              <Text style={styles.segSub}>Asesoría, trámites y salud</Text>
-            </View>
-            <View style={styles.grid}>
-              {pros.map((c) => (
-                <CategoryTile key={c.slug} c={c} />
-              ))}
-            </View>
-          </PatternView>
-          ) : null}
-
-          {lf !== 'profesionales' ? (
-          <PatternView kind="oficios" style={styles.segment}>
-            <View style={styles.segHead}>
-              <Ionicons name="hammer" size={18} color="#8A5A2B" />
-              <Text style={[styles.segTitle, { color: '#5E3C1A' }]}>Oficios</Text>
-              <Text style={styles.segSub}>Arreglos y trabajos en casa</Text>
-            </View>
-            <View style={styles.grid}>
-              {trades.map((c) => (
-                <CategoryTile key={c.slug} c={c} />
-              ))}
-            </View>
-          </PatternView>
-          ) : null}
-
-          <SectionTitle title="Mejor calificados cerca de ti" action="Ver todos" onAction={() => router.push('/cliente/explorar')} />
-          <View style={{ gap: 10 }}>
+          <SectionTitle title="Los mejores cerca de ti" action="Ver todos" onAction={() => router.push('/cliente/explorar')} />
+          <View style={{ gap: 12 }}>
             {top.slice(0, 1).map((b) => (
               <BusinessCard key={b.slug} business={b} source="inicio" />
             ))}
@@ -245,36 +273,36 @@ export default function Inicio() {
 }
 
 const styles = StyleSheet.create({
-  header: { backgroundColor: Brand.chile, paddingHorizontal: 20, paddingBottom: 22, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  header: { backgroundColor: Brand.chile, paddingHorizontal: 18, paddingBottom: 20, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  me: { width: 52, height: 52, borderRadius: 26, borderWidth: 2, borderColor: Brand.white, backgroundColor: Brand.white },
   hello: { color: '#D6E0F0', fontSize: 13 },
-  headline: { color: Brand.white, fontSize: 26, fontWeight: '800', letterSpacing: -0.4, marginTop: 2 },
-  search: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Brand.white, borderRadius: Radius.pill, paddingLeft: 16, paddingRight: 6, height: 54, marginTop: 16 },
-  searchInput: { flex: 1, fontSize: 15, color: Brand.ink, height: '100%' },
-  searchBtn: { backgroundColor: Brand.mango, borderRadius: Radius.pill, paddingHorizontal: 14, height: 42, justifyContent: 'center' },
-  searchBtnText: { fontWeight: '800', color: Brand.ink },
-  freq: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
-  freqText: { color: Brand.white, fontSize: 13, fontWeight: '600' },
+  headline: { color: Brand.white, fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Brand.white, borderRadius: Radius.pill, paddingLeft: 16, paddingRight: 6, height: 58, marginTop: 14 },
+  searchInput: { flex: 1, fontSize: 16, color: Brand.ink, height: '100%' },
+  searchBtn: { backgroundColor: Brand.mango, borderRadius: Radius.pill, paddingHorizontal: 16, height: 46, justifyContent: 'center' },
+  searchBtnText: { fontWeight: '800', color: Brand.ink, fontSize: 15 },
+  mic: { width: 46, height: 46, borderRadius: 23, backgroundColor: Brand.mangoSoft, alignItems: 'center', justifyContent: 'center' },
+  voiceHint: { color: Brand.white, fontSize: 13, marginTop: 8, textAlign: 'center' },
+  problem: { width: 96, height: 104, backgroundColor: Brand.white, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 8 },
+  problemText: { fontSize: 12, fontWeight: '800', color: Brand.ink, textAlign: 'center' },
   upcoming: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Brand.white, borderRadius: Radius.lg, padding: 14, marginTop: 16 },
-  upIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: Brand.nopal, alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { fontSize: 14, fontWeight: '800', color: Brand.ink },
+  cardTitle: { fontSize: 15, fontWeight: '800', color: Brand.ink },
   cardSub: { fontSize: 12, color: Brand.inkSoft, marginTop: 2 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
-  segment: { marginTop: 18, borderRadius: Radius.lg, paddingVertical: 14, paddingHorizontal: 6, borderWidth: 1, borderColor: Brand.line },
-  segHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 12, flexWrap: 'wrap' },
-  segTitle: { fontSize: 18, fontWeight: '800', color: Brand.chileDark },
-  segSub: { fontSize: 12, color: Brand.inkSoft },
   quick: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, backgroundColor: Brand.white, borderRadius: Radius.lg, paddingVertical: 12, ...Shadow },
   quickItem: { flex: 1, alignItems: 'center', gap: 6 },
-  quickIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontSize: 12, fontWeight: '700', color: Brand.ink },
-  promo: { width: 200, padding: 14, borderRadius: Radius.lg, ...Shadow },
-  promoPhoto: { height: 100, marginHorizontal: -14, marginBottom: 10 },
-  promoTag: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
-  promoBadge: { fontSize: 26, fontWeight: '800', marginTop: 4 },
-  promoTitle: { fontSize: 14, fontWeight: '800', marginTop: 2 },
-  promoText: { fontSize: 12, marginTop: 2 },
+  quickIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.tortilla },
+  quickLabel: { fontSize: 13, fontWeight: '800', color: Brand.ink },
+  segment: { marginTop: 18, borderRadius: Radius.lg, paddingVertical: 14, paddingHorizontal: 6, borderWidth: 1, borderColor: Brand.line },
+  segHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 12 },
+  segTitle: { flex: 1, fontSize: 20, fontWeight: '800', color: Brand.chileDark },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
   tile: { width: '33.33%', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
-  tileIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  tileLabel: { fontSize: 12, fontWeight: '600', color: Brand.ink, textAlign: 'center' },
+  tileIcon: { width: 78, height: 78, borderRadius: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 2, backgroundColor: Brand.white },
+  tileLabel: { fontSize: 13, fontWeight: '700', color: Brand.ink, textAlign: 'center' },
+  promo: { width: 210, padding: 14, borderRadius: Radius.lg, gap: 2, ...Shadow },
+  promoPhoto: { height: 100, marginHorizontal: -14, marginBottom: 10 },
+  promoBadge: { fontSize: 30, fontWeight: '800' },
+  promoTitle: { fontSize: 15, fontWeight: '800', marginTop: 4 },
+  promoText: { fontSize: 12 },
 });

@@ -1,0 +1,22 @@
+/** Caras ilustradas de los perfiles de ejemplo ("Personas" de DiceBear por Draftbot, CC BY 4.0). Generado por scripts/generate-avatars.js */
+export const AVATARS: Record<string, number> = {
+  'lic-mariana-ortiz': require('../../assets/avatars/lic-mariana-ortiz.svg'),
+  'ortiz-salinas-abogados': require('../../assets/avatars/ortiz-salinas-abogados.svg'),
+  'lic-roberto-campos': require('../../assets/avatars/lic-roberto-campos.svg'),
+  'lic-daniela-trevino': require('../../assets/avatars/lic-daniela-trevino.svg'),
+  'despacho-contable-reyes': require('../../assets/avatars/despacho-contable-reyes.svg'),
+  'cp-laura-mendez': require('../../assets/avatars/cp-laura-mendez.svg'),
+  'notaria-publica-14': require('../../assets/avatars/notaria-publica-14.svg'),
+  'traducciones-peritas-morales': require('../../assets/avatars/traducciones-peritas-morales.svg'),
+  'psic-andrea-vidal': require('../../assets/avatars/psic-andrea-vidal.svg'),
+  'arq-diego-fuentes': require('../../assets/avatars/arq-diego-fuentes.svg'),
+  'patricia-luna-seguros': require('../../assets/avatars/patricia-luna-seguros.svg'),
+  'rumbo-consultores': require('../../assets/avatars/rumbo-consultores.svg'),
+  'plomeria-hernandez': require('../../assets/avatars/plomeria-hernandez.svg'),
+  'electrica-ramirez': require('../../assets/avatars/electrica-ramirez.svg'),
+  'carpinteria-don-chuy': require('../../assets/avatars/carpinteria-don-chuy.svg'),
+  'climas-del-bajio': require('../../assets/avatars/climas-del-bajio.svg'),
+  'acabados-mendoza': require('../../assets/avatars/acabados-mendoza.svg'),
+  'cerrajeria-llave-maestra': require('../../assets/avatars/cerrajeria-llave-maestra.svg'),
+  'usuario': require('../../assets/avatars/usuario.svg'),
+};

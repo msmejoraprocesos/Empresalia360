@@ -1,14 +1,15 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Brand, Radius } from '@/constants/theme';
-import type { IconName } from '@/data/types';
+import type { EmojiName } from '@/constants/emoji';
 import { useApp, type LookingFor } from '@/store/app';
 
-const OPTIONS: { v: LookingFor; label: string; sub: string; icon: IconName }[] = [
-  { v: 'todo', label: 'Todo', sub: 'Ver ambos', icon: 'apps' },
-  { v: 'profesionales', label: 'Profesional', sub: 'Abogado, contador', icon: 'briefcase' },
-  { v: 'oficios', label: 'Oficio', sub: 'Plomero, técnico', icon: 'hammer' },
+import { Emoji } from './emoji';
+
+const OPTIONS: { v: LookingFor; label: string; sub: string; icon: EmojiName }[] = [
+  { v: 'todo', label: 'Todo', sub: 'Ver ambos', icon: 'lupa' },
+  { v: 'profesionales', label: 'Profesional', sub: 'Abogado, contador', icon: 'portafolio' },
+  { v: 'oficios', label: 'Oficio', sub: 'Plomero, técnico', icon: 'caja_herramientas' },
 ];
 
 /** Selector "¿Qué buscas?": todo, un profesional o un oficio. */
@@ -26,7 +27,7 @@ export function LookingForSwitch({ dark }: { dark?: boolean }) {
             accessibilityState={{ checked: on }}
             onPress={() => actions.setLookingFor(o.v)}
             style={[styles.opt, on && { backgroundColor: Brand.white }]}>
-            <Ionicons name={o.icon} size={18} color={on ? tint : dark ? Brand.white : Brand.inkSoft} />
+            <Emoji name={o.icon} size={30} />
             <View style={{ alignItems: 'center' }}>
               <Text style={[styles.label, { color: on ? tint : dark ? Brand.white : Brand.ink }]}>{o.label}</Text>
               <Text style={[styles.sub, { color: on ? Brand.inkSoft : dark ? '#D6E0F0' : Brand.inkMuted }]} numberOfLines={1}>

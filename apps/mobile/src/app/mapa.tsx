@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { consultLabel, ProAvatar } from '@/components/business-card';
 import { BusinessMap } from '@/components/business-map';
+import { Emoji } from '@/components/emoji';
 import { Button, Chip, RoundIconButton } from '@/components/ui';
 import { Brand, Radius, Shadow, ShadowStrong } from '@/constants/theme';
 import { BUSINESSES, CATEGORIES, distanceTo, getBusiness, primaryAction } from '@/data';
@@ -92,6 +93,7 @@ export default function Mapa() {
             return (
               <Pressable key={c.slug} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setCat(on ? null : c.slug)} style={[styles.catPill, Shadow, on && { backgroundColor: color }]}>
                 <View style={[styles.dot, { backgroundColor: on ? Brand.white : color }]} />
+                <Emoji name={c.emoji} size={18} />
                 <Text style={[styles.catText, on && { color: c.ink === Brand.ink ? Brand.ink : Brand.white }]}>{c.name}</Text>
               </Pressable>
             );
@@ -103,9 +105,8 @@ export default function Mapa() {
             <Text style={styles.legendTitle}>Colores del mapa</Text>
             {CATEGORIES.map((c) => (
               <View key={c.slug} style={styles.legendRow}>
-                <View style={[styles.legendPin, { backgroundColor: c.color === Brand.line ? Brand.inkSoft : c.color }]}>
-                  <Ionicons name={c.icon} size={12} color={c.ink === Brand.mango ? Brand.mango : c.color === Brand.mango ? Brand.ink : Brand.white} />
-                </View>
+                <View style={[styles.legendPin, { backgroundColor: c.color === Brand.line ? Brand.inkSoft : c.color }]} />
+                <Emoji name={c.emoji} size={22} />
                 <Text style={styles.legendText}>{c.name}</Text>
                 <Text style={styles.legendCount}>{BUSINESSES.filter((x) => x.categorySlug === c.slug).length}</Text>
               </View>

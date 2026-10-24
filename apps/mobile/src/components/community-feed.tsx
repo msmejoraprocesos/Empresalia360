@@ -10,7 +10,8 @@ import { markSource } from '@/lib/analytics';
 import { money } from '@/lib/format';
 import { useApp } from '@/store/app';
 
-import { ProAvatar } from './business-card';
+import { ProAvatar, Tag } from './business-card';
+import { Emoji } from './emoji';
 import { Chip } from './ui';
 
 const KIND: Record<Post['kind'], { label: string; icon: 'megaphone-outline' | 'bulb-outline' | 'calendar-outline'; bg: string; fg: string }> = {
@@ -76,7 +77,7 @@ export function PostCard({ post, compact }: { post: Post; compact?: boolean }) {
             {b.profession} · ★ {b.rating.toFixed(1)} · {post.dateLabel}
           </Text>
         </View>
-        <Chip label={k.label} color={k.bg} ink={k.fg} icon={k.icon} />
+        <Tag emoji={post.kind === 'servicio' ? 'megafono' : post.kind === 'consejo' ? 'foco' : 'fiesta'} text={k.label} bg={k.bg} fg={k.fg} />
       </Pressable>
 
       <Text style={styles.title}>{post.title}</Text>
@@ -100,7 +101,7 @@ export function PostCard({ post, compact }: { post: Post; compact?: boolean }) {
 
       <View style={styles.actions}>
         <Pressable accessibilityRole="button" accessibilityLabel={liked ? 'Quitar me sirve' : 'Me sirve'} onPress={() => actions.toggleLike(post.id)} style={styles.action}>
-          <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={18} color={liked ? Brand.chile : Brand.inkSoft} />
+          <Emoji name="pulgar" size={20} style={liked ? undefined : { opacity: 0.55 }} />
           <Text style={[styles.actionText, liked && { color: Brand.chile }]}>Me sirve · {post.likes}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={() => setOpen(!open)} style={styles.action}>
