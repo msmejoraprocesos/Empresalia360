@@ -7,6 +7,7 @@ import { Pattern } from '@/components/pattern-background';
 import { QuestionCard } from '@/components/questions';
 import { Button, EmptyState, Header, Segmented } from '@/components/ui';
 import { Brand, TabBarSpace } from '@/constants/theme';
+import { categoryBySlug, getBusiness } from '@/data';
 import { myBusiness, useApp } from '@/store/app';
 
 export default function ComunidadProfesional() {
@@ -15,7 +16,10 @@ export default function ComunidadProfesional() {
   const [tab, setTab] = useState<'muro' | 'preguntas'>('preguntas');
   const [filter, setFilter] = useState<FeedFilter>('todos');
   const [mine, setMine] = useState(false);
-  const posts = state.posts.filter((p) => (filter === 'todos' || p.kind === filter) && (!mine || p.businessSlug === myBusiness.slug));
+  const myGroup = categoryBySlug(myBusiness.categorySlug)?.group;
+  const posts = state.posts.filter(
+    (p) => (filter === 'todos' || p.kind === filter) && (!mine || p.businessSlug === myBusiness.slug) && categoryBySlug(getBusiness(p.businessSlug)?.categorySlug ?? '')?.group === myGroup,
+  );
   // Preguntas de su categoría que aún no responde
   const questions = state.questions.filter((q) => q.categorySlug === myBusiness.categorySlug && !q.answers.some((a) => a.businessSlug === myBusiness.slug));
 

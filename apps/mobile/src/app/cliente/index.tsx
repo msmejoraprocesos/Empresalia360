@@ -14,6 +14,7 @@ import { SectionTitle } from '@/components/ui';
 import { AVATARS } from '@/constants/avatars';
 import type { EmojiName } from '@/constants/emoji';
 import { Brand, Radius, Shadow, TabBarSpace } from '@/constants/theme';
+import { WORLD } from '@/constants/world';
 import { CATEGORIES, getBusiness, PROMOTIONS, searchProfessionals } from '@/data';
 import type { Category } from '@/data/types';
 import { markSource } from '@/lib/analytics';
@@ -87,27 +88,27 @@ export default function Inicio() {
     go(t);
   });
 
-  const pros = CATEGORIES.filter((c) => c.group === 'profesionales');
-  const trades = CATEGORIES.filter((c) => c.group === 'oficios');
   const lf = state.lookingFor;
-  const inGroup = (slug: string) => lf === 'todo' || CATEGORIES.find((c) => c.slug === slug)?.group === lf;
+  const world = WORLD[lf];
+  const cats = CATEGORIES.filter((c) => c.group === lf);
+  const inGroup = (slug: string) => CATEGORIES.find((c) => c.slug === slug)?.group === lf;
   const featured = getBusiness(lf === 'oficios' ? 'plomeria-hernandez' : 'despacho-contable-reyes');
   const top = searchProfessionals('', { sort: 'relevancia' })
     .filter((b) => inGroup(b.categorySlug) && b.slug !== featured?.slug)
     .slice(0, 3);
-  const freq = FREQUENT.filter((f) => lf === 'todo' || f.g === lf);
+  const freq = FREQUENT.filter((f) => f.g === lf);
   const upcoming = state.orders.find((o) => o.type === 'cita' && o.status === 'confirmada');
-  const posts = state.posts.slice(0, 2);
+  const posts = state.posts.filter((p) => inGroup(getBusiness(p.businessSlug)?.categorySlug ?? '')).slice(0, 2);
   void state.profileVersion;
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
       <ScrollView contentContainerStyle={{ paddingBottom: TabBarSpace }} keyboardShouldPersistTaps="handled">
-        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 14, backgroundColor: world.color }]}>
           <View style={styles.headerRow}>
             <Image source={AVATARS.usuario} style={styles.me} contentFit="cover" accessibilityLabel="Tu foto" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.hello}>
+              <Text style={[styles.hello, { color: world.ink }]}>
                 {greeting()}, {state.userName}
               </Text>
               <Text style={styles.headline}>¿Qué necesitas?</Text>
@@ -115,7 +116,7 @@ export default function Inicio() {
             <SpeakButton
               dark
               compact
-              text={`${greeting()}, ${state.userName}. ¿Qué necesitas? Toca un dibujo para buscar un experto, o toca el micrófono y dilo con tu voz.`}
+              text={`${greeting()}, ${state.userName}. Estás en ${world.name}: ${world.who}. Toca un dibujo para buscar, o toca el micrófono y dilo con tu voz. Para cambiar, toca el otro botón de arriba.`}
             />
           </View>
           <View style={{ marginTop: 14 }}>
@@ -128,7 +129,7 @@ export default function Inicio() {
               onChangeText={setQ}
               onSubmitEditing={() => go(q)}
               returnKeyType="search"
-              placeholder={lf === 'oficios' ? 'Fuga, luz, cerradura…' : lf === 'profesionales' ? 'Despido, divorcio, impuestos…' : 'Escribe o habla'}
+              placeholder={lf === 'oficios' ? 'Fuga, luz, cerradura…' : 'Despido, divorcio, impuestos…'}
               placeholderTextColor={Brand.inkMuted}
               style={styles.searchInput}
               accessibilityLabel="Describe tu problema o busca un experto"
@@ -187,35 +188,21 @@ export default function Inicio() {
             ))}
           </View>
 
-          {lf !== 'oficios' ? (
-            <PatternView kind="profesionales" style={styles.segment}>
-              <View style={styles.segHead}>
-                <Emoji name="portafolio" size={26} />
-                <Text style={styles.segTitle}>Profesionales</Text>
-                <SpeakButton compact text={`Profesionales: ${pros.map((c) => c.name).join(', ')}.`} />
+          <PatternView kind={lf} style={styles.segment}>
+            <View style={styles.segHead}>
+              <Emoji name={world.emoji} size={26} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.segTitle, { color: world.dark }]}>{world.name}</Text>
+                <Text style={styles.segSub}>{world.sub}</Text>
               </View>
-              <View style={styles.grid}>
-                {pros.map((c) => (
-                  <CategoryTile key={c.slug} c={c} />
-                ))}
-              </View>
-            </PatternView>
-          ) : null}
-
-          {lf !== 'profesionales' ? (
-            <PatternView kind="oficios" style={styles.segment}>
-              <View style={styles.segHead}>
-                <Emoji name="caja_herramientas" size={26} />
-                <Text style={[styles.segTitle, { color: '#5E3C1A' }]}>Oficios</Text>
-                <SpeakButton compact text={`Oficios: ${trades.map((c) => c.name).join(', ')}.`} />
-              </View>
-              <View style={styles.grid}>
-                {trades.map((c) => (
-                  <CategoryTile key={c.slug} c={c} />
-                ))}
-              </View>
-            </PatternView>
-          ) : null}
+              <SpeakButton compact text={`${world.name}: ${cats.map((c) => c.name).join(', ')}.`} />
+            </View>
+            <View style={styles.grid}>
+              {cats.map((c) => (
+                <CategoryTile key={c.slug} c={c} />
+              ))}
+            </View>
+          </PatternView>
 
           <SectionTitle title="Promociones" action="Mis regalos" onAction={() => router.push('/lealtad')} />
         </View>
@@ -249,7 +236,7 @@ export default function Inicio() {
         </ScrollView>
 
         <View style={{ paddingHorizontal: 16 }}>
-          <SectionTitle title="Los mejores cerca de ti" action="Ver todos" onAction={() => router.push('/cliente/explorar')} />
+          <SectionTitle title={`${world.name} mejor calificados`} action="Ver todos" onAction={() => router.push('/cliente/explorar')} />
           <View style={{ gap: 12 }}>
             {top.slice(0, 1).map((b) => (
               <BusinessCard key={b.slug} business={b} source="inicio" />
@@ -295,7 +282,8 @@ const styles = StyleSheet.create({
   quickLabel: { fontSize: 13, fontWeight: '800', color: Brand.ink },
   segment: { marginTop: 18, borderRadius: Radius.lg, paddingVertical: 14, paddingHorizontal: 6, borderWidth: 1, borderColor: Brand.line },
   segHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 12 },
-  segTitle: { flex: 1, fontSize: 20, fontWeight: '800', color: Brand.chileDark },
+  segTitle: { fontSize: 20, fontWeight: '800', color: Brand.chileDark },
+  segSub: { fontSize: 12, color: Brand.inkSoft },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
   tile: { width: '33.33%', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
   tileIcon: { width: 78, height: 78, borderRadius: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 2, backgroundColor: Brand.white },

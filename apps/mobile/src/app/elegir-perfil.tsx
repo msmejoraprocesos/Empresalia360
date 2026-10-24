@@ -60,7 +60,7 @@ export default function ElegirPerfil() {
           label="Continuar"
           onPress={() => {
             actions.setRole(role);
-            router.replace(role === 'negocio' ? '/mi-negocio/perfil' : '/cliente');
+            router.replace(role === 'negocio' ? '/mi-negocio/perfil' : '/mundo');
           }}
         />
       </BottomBar>

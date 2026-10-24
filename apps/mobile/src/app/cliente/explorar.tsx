@@ -8,6 +8,7 @@ import { Emoji } from '@/components/emoji';
 import { SpeakButton } from '@/components/speak-button';
 import type { EmojiName } from '@/constants/emoji';
 import { useVoiceSearch } from '@/lib/voice';
+import { WORLD, type World } from '@/constants/world';
 import { LookingForSwitch } from '@/components/looking-for';
 import { PatternView } from '@/components/pattern-background';
 import { EmptyState, Header, RoundIconButton } from '@/components/ui';
@@ -35,7 +36,7 @@ const SORTS: { v: NonNullable<SearchFilters['sort']>; label: string }[] = [
 export default function Explorar() {
   const router = useRouter();
   const params = useLocalSearchParams<{ q?: string; especialidad?: string }>();
-  const { state } = useApp();
+  const { state, actions } = useApp();
   const [q, setQ] = useState(params.q ?? '');
   const [specialty, setSpecialty] = useState<string | undefined>(params.especialidad);
   const [attend, setAttend] = useState<Attend>();
@@ -58,15 +59,21 @@ export default function Explorar() {
     setQ(t);
     setSpecialty(undefined);
   });
-  const suggestions = specialtiesFor(q).filter((s) => lf === 'todo' || s.category.group === lf);
+  const allSuggestions = specialtiesFor(q);
+  const suggestions = allSuggestions.filter((s) => s.category.group === lf);
+  // Lo que buscó lo resuelve el otro mundo (ej. busca "fuga" estando en Profesionistas)
+  const other: World = lf === 'profesionales' ? 'oficios' : 'profesionales';
+  const otherHits = allSuggestions.filter((s) => s.category.group === other);
   const autoSpecialty = !specialty && suggestions.length === 1 ? suggestions[0].specialty : undefined;
-  const results = searchProfessionals(specialty ? '' : q, { specialty, attend, verified, freeConsult, sort }).filter((b) => !urgent || b.urgent24).filter((b) => lf === 'todo' || categoryBySlug(b.categorySlug)?.group === lf);
+  const results = searchProfessionals(specialty ? '' : q, { specialty, attend, verified, freeConsult, sort }).filter((b) => !urgent || b.urgent24).filter((b) => categoryBySlug(b.categorySlug)?.group === lf);
   const searching = Boolean(q.trim() || specialty);
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
       <Header
-        title="Buscar un experto"
+        color={WORLD[lf].color}
+        subtitle={`${WORLD[lf].name} · ${WORLD[lf].sub}`}
+        title="Buscar"
         back={false}
         right={<RoundIconButton icon="map-outline" label="Ver en el mapa" bg="rgba(0,0,0,0.16)" color={Brand.white} onPress={() => router.push('/mapa')} />}>
         <View style={styles.search}>
@@ -104,6 +111,16 @@ export default function Explorar() {
         <View style={{ paddingHorizontal: 16 }}>
           <LookingForSwitch />
         </View>
+        {otherHits.length && !suggestions.length ? (
+          <Pressable accessibilityRole="button" onPress={() => actions.setLookingFor(other)} style={[styles.otherWorld, { borderColor: WORLD[other].color }]}>
+            <Emoji name={WORLD[other].emoji} size={36} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.otherTitle, { color: WORLD[other].color }]}>{other === 'oficios' ? 'Esto lo resuelve alguien de oficio' : 'Esto lo resuelve un profesionista'}</Text>
+              <Text style={styles.otherSub}>Toca aquí para buscar en {WORLD[other].name}</Text>
+            </View>
+          </Pressable>
+        ) : null}
+
         {suggestions.length ? (
           <View style={{ gap: 8 }}>
             <Text style={[styles.label, { paddingHorizontal: 16 }]}>Especialidades que te pueden ayudar</Text>
@@ -126,7 +143,7 @@ export default function Explorar() {
           <View style={{ paddingHorizontal: 16, gap: 10 }}>
             <Text style={styles.label}>Explora por profesión u oficio</Text>
             <View style={styles.catWrap}>
-              {CATEGORIES.filter((c) => lf === 'todo' || c.group === lf).map((c) => (
+              {CATEGORIES.filter((c) => c.group === lf).map((c) => (
                 <Pressable key={c.slug} accessibilityRole="button" onPress={() => router.push(`/categoria/${c.slug}`)} style={styles.cat}>
                   <Emoji name={c.emoji} size={34} />
                   <Text style={styles.catText} numberOfLines={2}>
@@ -174,7 +191,7 @@ export default function Explorar() {
               ))}
             </ScrollView>
           </View>
-          {(['profesionales', 'oficios'] as const).filter((g) => lf === 'todo' || g === lf).map((g) => {
+          {(['profesionales', 'oficios'] as const).filter((g) => g === lf).map((g) => {
             const part = results.filter((b) => categoryBySlug(b.categorySlug)?.group === g);
             if (!part.length) return null;
             return (
@@ -193,7 +210,7 @@ export default function Explorar() {
               </PatternView>
             );
           })}
-          {results.length === 0 ? (
+          {results.length === 0 && !otherHits.length ? (
             <EmptyState icon="search-outline" title="Sin resultados" text="Prueba con otras palabras, como “divorcio”, “fuga” o “declaración”, o quita algún filtro." />
           ) : null}
         </View>
@@ -215,6 +232,9 @@ const styles = StyleSheet.create({
   mic: { width: 40, height: 40, borderRadius: 20, backgroundColor: Brand.mangoSoft, alignItems: 'center', justifyContent: 'center', marginRight: -10 },
   resultsHead: { gap: 6 },
   count: { fontSize: 18, fontWeight: '800', color: Brand.ink },
+  otherWorld: { marginHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: Radius.lg, borderWidth: 2, backgroundColor: Brand.white },
+  otherTitle: { fontSize: 15, fontWeight: '800' },
+  otherSub: { fontSize: 12, color: Brand.inkSoft, marginTop: 2 },
   segment: { borderRadius: 22, padding: 10, borderWidth: 1, borderColor: Brand.line },
   segHead: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingBottom: 10 },
   segTitle: { fontSize: 15, fontWeight: '800', color: Brand.chileDark },

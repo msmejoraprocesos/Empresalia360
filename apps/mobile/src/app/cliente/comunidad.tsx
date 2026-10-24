@@ -3,7 +3,10 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FeedFilters, PostCard, type FeedFilter } from '@/components/community-feed';
 import { Pattern } from '@/components/pattern-background';
+import { LookingForSwitch } from '@/components/looking-for';
 import { AskForm, QuestionCard } from '@/components/questions';
+import { WORLD } from '@/constants/world';
+import { categoryBySlug, getBusiness } from '@/data';
 import { Card, EmptyState, Header, Segmented } from '@/components/ui';
 import { Brand, Radius, TabBarSpace } from '@/constants/theme';
 import { useApp } from '@/store/app';
@@ -19,23 +22,29 @@ export default function Comunidad() {
   const { state } = useApp();
   const [tab, setTab] = useState<'muro' | 'preguntas'>('muro');
   const [filter, setFilter] = useState<FeedFilter>('todos');
-  const posts = state.posts.filter((p) => filter === 'todos' || p.kind === filter);
+  const lf = state.lookingFor;
+  const inWorld = (catSlug?: string) => categoryBySlug(catSlug ?? '')?.group === lf;
+  const posts = state.posts.filter((p) => (filter === 'todos' || p.kind === filter) && inWorld(getBusiness(p.businessSlug)?.categorySlug));
+  const questions = state.questions.filter((q) => inWorld(q.categorySlug));
   const level = [...LEVELS].reverse().find((l) => state.points >= l.min) ?? LEVELS[0];
   const next = LEVELS[LEVELS.indexOf(level) + 1];
   const progress = next ? (state.points - level.min) / (next.min - level.min) : 1;
 
   return (
     <View style={{ flex: 1 }}>
-      <Pattern kind="comunidad" />
-      <Header title="Comunidad" subtitle="Servicios, consejos y preguntas a expertos de tu zona" back={false}>
-        <View style={{ marginTop: 14 }}>
+      <Pattern kind={lf} />
+      <Header title="Comunidad" subtitle={`${WORLD[lf].name} · servicios, consejos y preguntas`} back={false} color={WORLD[lf].color}>
+        <View style={{ marginTop: 12 }}>
+          <LookingForSwitch dark />
+        </View>
+        <View style={{ marginTop: 10 }}>
           <Segmented
             dark
             value={tab}
             onChange={setTab}
             options={[
               { value: 'muro', label: 'Muro' },
-              { value: 'preguntas', label: `Preguntas (${state.questions.length})` },
+              { value: 'preguntas', label: `Preguntas (${questions.length})` },
             ]}
           />
         </View>
@@ -69,7 +78,7 @@ export default function Comunidad() {
         ) : (
           <View style={{ paddingHorizontal: 16, gap: 12 }}>
             <AskForm />
-            {state.questions.map((q) => (
+            {questions.map((q) => (
               <QuestionCard key={q.id} q={q} />
             ))}
           </View>

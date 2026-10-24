@@ -13,8 +13,10 @@ import { Button, Chip } from './ui';
 
 /** Formulario para que el cliente pregunte a los expertos de una categoría. */
 export function AskForm() {
-  const { actions } = useApp();
-  const [categorySlug, setCategorySlug] = useState('abogados');
+  const { state, actions } = useApp();
+  const cats = CATEGORIES.filter((c) => c.group === state.lookingFor);
+  const [picked, setCategorySlug] = useState<string>();
+  const categorySlug = picked && cats.some((c) => c.slug === picked) ? picked : cats[0]?.slug ?? 'abogados';
   const [body, setBody] = useState('');
   const [sent, setSent] = useState(false);
   return (
@@ -25,7 +27,7 @@ export function AskForm() {
       </View>
       <Text style={styles.sub}>Tu pregunta es anónima y la responden expertos verificados de la zona.</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-        {CATEGORIES.map((c) => {
+        {cats.map((c) => {
           const on = c.slug === categorySlug;
           return (
             <Pressable key={c.slug} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setCategorySlug(c.slug)} style={[styles.pill, on && styles.pillOn]}>

@@ -13,16 +13,18 @@ import { Brand, Radius, Shadow, ShadowStrong } from '@/constants/theme';
 import { BUSINESSES, CATEGORIES, distanceTo, getBusiness, primaryAction } from '@/data';
 import { markSource } from '@/lib/analytics';
 import { distance } from '@/lib/format';
+import { WORLD } from '@/constants/world';
 import { useApp } from '@/store/app';
 
-type Group = 'todos' | 'profesionales' | 'oficios';
+type Group = 'profesionales' | 'oficios';
 
 export default function Mapa() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ slug?: string }>();
-  const { state } = useApp();
-  const [group, setGroup] = useState<Group>(state.lookingFor === 'todo' ? 'todos' : state.lookingFor);
+  const { state, actions } = useApp();
+  const group: Group = state.lookingFor;
+  const setGroup = (g: Group) => actions.setLookingFor(g);
   const [cat, setCat] = useState<string | null>(null);
   const [urgent, setUrgent] = useState(false);
   const [openNow, setOpenNow] = useState(false);
@@ -44,7 +46,7 @@ export default function Mapa() {
     })();
   }, []);
 
-  const cats = CATEGORIES.filter((c) => group === 'todos' || c.group === group);
+  const cats = CATEGORIES.filter((c) => c.group === group);
   const list = BUSINESSES.filter(
     (x) => cats.some((c) => c.slug === x.categorySlug) && (!cat || x.categorySlug === cat) && (!urgent || x.urgent24) && (!openNow || x.isOpen),
   );
@@ -65,7 +67,7 @@ export default function Mapa() {
           <RoundIconButton icon={legend ? 'close' : 'color-palette-outline'} label="Colores del mapa" onPress={() => setLegend(!legend)} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 10 }}>
-          {(['todos', 'profesionales', 'oficios'] as Group[]).map((g) => (
+          {(['profesionales', 'oficios'] as Group[]).map((g) => (
             <Pressable
               key={g}
               accessibilityRole="button"
@@ -74,8 +76,8 @@ export default function Mapa() {
                 setGroup(g);
                 setCat(null);
               }}
-              style={[styles.pill, Shadow, group === g && styles.pillDark]}>
-              <Text style={[styles.pillText, group === g && { color: Brand.white }]}>{g === 'todos' ? 'Todo' : g === 'profesionales' ? 'Profesionales' : 'Oficios'}</Text>
+              style={[styles.pill, Shadow, group === g && { backgroundColor: WORLD[g].color }]}>
+              <Text style={[styles.pillText, group === g && { color: Brand.white }]}>{g === 'profesionales' ? 'Profesionistas' : 'Oficios'}</Text>
             </Pressable>
           ))}
           <Pressable accessibilityRole="button" onPress={() => setUrgent(!urgent)} style={[styles.pill, Shadow, urgent && { backgroundColor: '#A32020' }]}>

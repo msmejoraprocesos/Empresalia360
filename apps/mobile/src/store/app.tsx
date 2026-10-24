@@ -71,12 +71,14 @@ export type ProfilePatch = Partial<
   >
 >;
 
-export type LookingFor = 'todo' | 'profesionales' | 'oficios';
+export type LookingFor = 'profesionales' | 'oficios';
 
 type State = {
   role: Role | null;
   /** Qué busca el cliente: lo elige en el inicio y se respeta en búsqueda y mapa */
   lookingFor: LookingFor;
+  /** Ya eligió mundo al menos una vez */
+  worldChosen: boolean;
   isAdmin: boolean;
   userName: string;
   userPhone: string;
@@ -113,7 +115,8 @@ const myBusiness = BUSINESSES.find((b) => b.slug === MY_BUSINESS_SLUG) as Busine
 
 const initialState: State = {
   role: null,
-  lookingFor: 'todo',
+  lookingFor: 'profesionales',
+  worldChosen: false,
   isAdmin: false,
   userName: 'Ana',
   userPhone: '442 318 0094',
@@ -197,6 +200,15 @@ const initialState: State = {
 // iOS/Android, lo instala expo-sqlite desde src/lib/supabase.ts)
 // ─────────────────────────────────────────────────────────────
 const ROLE_KEY = 'expertalia360.role';
+const WORLD_KEY = 'expertalia360.mundo';
+function loadWorld(): LookingFor | null {
+  try {
+    const v = globalThis.localStorage?.getItem(WORLD_KEY);
+    return v === 'profesionales' || v === 'oficios' ? v : null;
+  } catch {
+    return null;
+  }
+}
 function loadRole(): Role | null {
   try {
     const v = globalThis.localStorage?.getItem(ROLE_KEY);
@@ -220,16 +232,27 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 // Contexto
 // ─────────────────────────────────────────────────────────────
 function useAppState() {
-  const [state, setState] = useState<State>(() => ({ ...initialState, role: loadRole() }));
+  const [state, setState] = useState<State>(() => {
+    const world = loadWorld();
+    return { ...initialState, role: loadRole(), lookingFor: world ?? initialState.lookingFor, worldChosen: Boolean(world) };
+  });
   const update = useCallback((fn: (s: State) => State) => setState(fn), []);
 
   useEffect(() => saveRole(state.role), [state.role]);
+  useEffect(() => {
+    if (!state.worldChosen) return;
+    try {
+      globalThis.localStorage?.setItem(WORLD_KEY, state.lookingFor);
+    } catch {
+      // sin almacenamiento: se elige cada vez
+    }
+  }, [state.lookingFor, state.worldChosen]);
 
   const actions = useMemo(
     () => ({
       setRole: (role: Role | null) => update((s) => ({ ...s, role })),
       setAdmin: (isAdmin: boolean) => update((s) => ({ ...s, isAdmin })),
-      setLookingFor: (lookingFor: LookingFor) => update((s) => ({ ...s, lookingFor })),
+      setLookingFor: (lookingFor: LookingFor) => update((s) => ({ ...s, lookingFor, worldChosen: true })),
       toggleFavorite: (slug: string) =>
         update((s) => ({
           ...s,
