@@ -1031,10 +1031,26 @@ const PACKAGES: Record<string, Business['items']> = {
   ],
 };
 
+/**
+ * Expertos que trabajan en varias categorías: aparecen en cada una (y en los dos mundos si aplica).
+ * Ej. un despacho contable que también da consultoría, o un arquitecto que también hace obra.
+ */
+const MULTI: Record<string, { categories: string[]; specialties: string[] }> = {
+  'despacho-contable-reyes': { categories: ['consultoria'], specialties: ['Finanzas para PyME'] },
+  'ortiz-salinas-abogados': { categories: ['contadores'], specialties: ['Contabilidad de empresas'] },
+  'arq-diego-fuentes': { categories: ['pintura-y-albanileria'], specialties: ['Albañilería', 'Impermeabilización'] },
+  'electrica-ramirez': { categories: ['climas'], specialties: ['Minisplits'] },
+};
+
 for (const b of BUSINESSES) {
   Object.assign(b, EXTRA[b.slug] ?? {});
   const extra = PACKAGES[b.slug];
   if (extra) b.items.push(...extra);
+  const multi = MULTI[b.slug];
+  if (multi) {
+    b.categorySlugs = multi.categories;
+    b.specialties = [...b.specialties, ...multi.specialties.filter((x) => !b.specialties.includes(x))];
+  }
 }
 
 export function categoryBySlug(slug: string): Category | undefined {

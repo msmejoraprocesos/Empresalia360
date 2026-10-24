@@ -11,6 +11,7 @@ import { ATTEND_ICON, ATTEND_LABEL, CATEGORIES, categoryBySlug } from '@/data';
 import type { Attend, Business, GalleryItem } from '@/data/types';
 import { Emoji } from '@/components/emoji';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { activePlan, CATEGORY_LIMIT, PLANS } from '@/data/billing';
 import { myBusiness, useApp } from '@/store/app';
 
 const LANGS = ['Español', 'Inglés', 'Francés', 'Alemán', 'Lengua de señas'];
@@ -66,13 +67,14 @@ export default function EditarPerfil() {
 
 function Editor() {
   const router = useRouter();
-  const { actions } = useApp();
+  const { state, actions } = useApp();
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
   const [name, setName] = useState(myBusiness.name);
   const [categorySlug, setCategorySlug] = useState(myBusiness.categorySlug);
+  const [extraCats, setExtraCats] = useState<string[]>((myBusiness.categorySlugs ?? []).filter((s) => s !== myBusiness.categorySlug));
   const [profession, setProfession] = useState(myBusiness.profession);
   const [specialties, setSpecialties] = useState<string[]>(myBusiness.specialties);
   const [custom, setCustom] = useState('');
@@ -98,13 +100,19 @@ function Editor() {
   const [paymentInfo, setPaymentInfo] = useState(myBusiness.paymentInfo ?? '');
 
   const cat = categoryBySlug(categorySlug);
-  const extra = specialties.filter((s) => !cat?.specialties.some((x) => x.name === s));
+  const selectedCats = [categorySlug, ...extraCats].map((s) => categoryBySlug(s)).filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const extra = specialties.filter((s) => !selectedCats.some((c) => c.specialties.some((x) => x.name === s)));
+  // Cuántas categorías permite su plan (la principal cuenta)
+  const bill = state.billing[myBusiness.slug];
+  const myPlan = bill ? activePlan(bill) : 'basico';
+  const maxExtra = CATEGORY_LIMIT[myPlan] - 1;
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const touch = () => setSaved(false);
 
   const patch = {
     name: name.trim(),
     categorySlug,
+    categorySlugs: extraCats,
     profession: profession.trim(),
     specialties,
     yearsExp: Number(years) || 0,
@@ -160,13 +168,47 @@ function Editor() {
                   if (c.slug !== categorySlug) {
                     setCategorySlug(c.slug);
                     setProfession(c.professional);
-                    setSpecialties([]);
+                    const keep = extraCats.filter((x) => x !== c.slug);
+                    setExtraCats(keep);
+                    // Se quedan las especialidades de las categorías que siguen elegidas
+                    setSpecialties(specialties.filter((s) => [c.slug, ...keep].some((k) => categoryBySlug(k)?.specialties.some((x) => x.name === s))));
                     touch();
                   }
                 }}
               />
             ))}
           </View>
+          <Text style={styles.fieldLabel}>¿Ofreces algo más? Aparece también en</Text>
+          <Text style={styles.hint}>
+            {maxExtra > 0
+              ? `Tu plan ${PLANS.find((p) => p.id === myPlan)?.name} te deja estar en ${maxExtra + 1} categorías. Llevas ${extraCats.length + 1}.`
+              : 'Con el plan Básico apareces en 1 categoría. Con Plata, en 3; con Oro, en 6.'}
+          </Text>
+          <View style={styles.wrap}>
+            {CATEGORIES.filter((c) => c.slug !== categorySlug).map((c) => {
+              const on = extraCats.includes(c.slug);
+              const locked = !on && extraCats.length >= maxExtra;
+              return (
+                <Toggle
+                  key={c.slug}
+                  label={locked ? `${c.name} 🔒` : c.name}
+                  icon={c.icon}
+                  on={on}
+                  onPress={() => {
+                    if (locked) {
+                      router.push('/mi-negocio/plan');
+                      return;
+                    }
+                    const next = on ? extraCats.filter((x) => x !== c.slug) : [...extraCats, c.slug];
+                    setExtraCats(next);
+                    if (on) setSpecialties(specialties.filter((s) => !c.specialties.some((x) => x.name === s) || cat?.specialties.some((x) => x.name === s)));
+                    touch();
+                  }}
+                />
+              );
+            })}
+          </View>
+          {maxExtra < 5 ? <Button label={maxExtra > 0 ? 'Quiero más categorías: ver planes' : 'Aparecer en más categorías: ver planes'} small variant="ghost" icon="ribbon-outline" onPress={() => router.push('/mi-negocio/plan')} /> : null}
           <Field
             label="Título que se muestra"
             value={profession}
@@ -236,18 +278,25 @@ function Editor() {
         </Section>
 
         <Section step={3} title="Tus especialidades" hint="Así te encuentran los clientes cuando describen su problema">
+          {selectedCats.map((c) => (
+            <View key={c.slug} style={{ gap: 6 }}>
+              {selectedCats.length > 1 ? <Text style={styles.fieldLabel}>{c.name}</Text> : null}
+              <View style={styles.wrap}>
+                {c.specialties.map((s) => (
+                  <Toggle
+                    key={s.name}
+                    label={s.name}
+                    on={specialties.includes(s.name)}
+                    onPress={() => {
+                      setSpecialties(toggle(specialties, s.name));
+                      touch();
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+          ))}
           <View style={styles.wrap}>
-            {cat?.specialties.map((s) => (
-              <Toggle
-                key={s.name}
-                label={s.name}
-                on={specialties.includes(s.name)}
-                onPress={() => {
-                  setSpecialties(toggle(specialties, s.name));
-                  touch();
-                }}
-              />
-            ))}
             {extra.map((s) => (
               <Toggle
                 key={s}

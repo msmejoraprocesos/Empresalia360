@@ -9,6 +9,9 @@ export const PLANS: { id: PlanId; name: string; price: number; features: string[
 ];
 export const planById = (id: PlanId) => PLANS.find((p) => p.id === id)!;
 
+/** Cuántas categorías puede tener cada plan (la principal cuenta) */
+export const CATEGORY_LIMIT: Record<PlanId, number> = { basico: 1, plata: 3, oro: 6 };
+
 /** Reglas automáticas: aviso antes de vencer y días de gracia antes de bajar a Básico. */
 export const DIAS_AVISO = 5;
 export const DIAS_GRACIA = 7;

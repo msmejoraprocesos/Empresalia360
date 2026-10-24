@@ -1,5 +1,5 @@
 // Expertalia 360: guarda la app en el teléfono para que abra rápido y sin internet.
-const CACHE = 'expertalia-20261024084401';
+const CACHE = 'expertalia-20261024090753';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

@@ -142,6 +142,49 @@ begin
 end;
 $$;
 
+-- Cuántas categorías puede tener cada negocio según su plan (la principal cuenta): Básico 1, Plata 3, Oro 6.
+alter table public.plans add column if not exists max_categories int not null default 1;
+update public.plans set max_categories = case id when 'basico' then 1 when 'plata' then 3 when 'oro' then 6 else 1 end;
+
+create or replace function public.businesses_limit_categories()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  max_extra int;
+begin
+  -- Sin repetir la principal ni categorías que no existen
+  new.extra_categories := coalesce(array(
+    select t.c from unnest(new.extra_categories) with ordinality as t(c, o)
+    where t.c <> coalesce((select slug from public.categories where id = new.category_id), '')
+      and exists (select 1 from public.categories x where x.slug = t.c)
+    group by t.c order by min(t.o)
+  ), '{}');
+  if session_user <> 'authenticator' or public.is_admin() then
+    return new;
+  end if;
+  select coalesce(max_categories, 1) - 1 into max_extra from public.plans where id = new.plan;
+  if coalesce(array_length(new.extra_categories, 1), 0) > coalesce(max_extra, 0) then
+    new.extra_categories := new.extra_categories[1:coalesce(max_extra, 0)];
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists businesses_categories_limit on public.businesses;
+create trigger businesses_categories_limit
+  before insert or update of extra_categories, plan, category_id on public.businesses
+  for each row execute function public.businesses_limit_categories();
+
+-- Al bajar a Básico por falta de pago, conserva sus categorías extra guardadas pero solo cuenta la principal
+create or replace function public.business_categories(b public.businesses)
+returns text[]
+language sql stable set search_path = ''
+as $$
+  select array[(select slug from public.categories where id = b.category_id)]
+    || case when b.plan = 'basico' then '{}'::text[] else b.extra_categories[1:(select max_categories - 1 from public.plans where id = b.plan)] end;
+$$;
+
 -- Comprobantes: bucket privado; el dueño sube a la carpeta de su negocio, solo él y el admin los ven
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('comprobantes', 'comprobantes', false, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])

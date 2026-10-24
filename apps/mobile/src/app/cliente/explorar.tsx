@@ -13,7 +13,7 @@ import { LookingForSwitch } from '@/components/looking-for';
 import { PatternView } from '@/components/pattern-background';
 import { EmptyState, Header, RoundIconButton } from '@/components/ui';
 import { Brand, Radius, TabBarSpace } from '@/constants/theme';
-import { ATTEND_LABEL, CATEGORIES, categoryBySlug, searchProfessionals, specialtiesFor, type SearchFilters } from '@/data';
+import { ATTEND_LABEL, CATEGORIES, inWorld, searchProfessionals, specialtiesFor, type SearchFilters } from '@/data';
 import type { Attend } from '@/data/types';
 import { useApp } from '@/store/app';
 
@@ -65,7 +65,7 @@ export default function Explorar() {
   const other: World = lf === 'profesionales' ? 'oficios' : 'profesionales';
   const otherHits = allSuggestions.filter((s) => s.category.group === other);
   const autoSpecialty = !specialty && suggestions.length === 1 ? suggestions[0].specialty : undefined;
-  const results = searchProfessionals(specialty ? '' : q, { specialty, attend, verified, freeConsult, sort }).filter((b) => !urgent || b.urgent24).filter((b) => categoryBySlug(b.categorySlug)?.group === lf);
+  const results = searchProfessionals(specialty ? '' : q, { specialty, attend, verified, freeConsult, sort }).filter((b) => !urgent || b.urgent24).filter((b) => inWorld(b, lf));
   const searching = Boolean(q.trim() || specialty);
 
   return (
@@ -192,7 +192,7 @@ export default function Explorar() {
             </ScrollView>
           </View>
           {(['profesionales', 'oficios'] as const).filter((g) => g === lf).map((g) => {
-            const part = results.filter((b) => categoryBySlug(b.categorySlug)?.group === g);
+            const part = results.filter((b) => inWorld(b, g));
             if (!part.length) return null;
             return (
               <PatternView key={g} kind={g} style={styles.segment}>

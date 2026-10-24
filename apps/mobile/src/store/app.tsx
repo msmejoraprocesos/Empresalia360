@@ -53,6 +53,7 @@ export type ProfilePatch = Partial<
     Business,
     | 'name'
     | 'categorySlug'
+    | 'categorySlugs'
     | 'profession'
     | 'specialties'
     | 'yearsExp'

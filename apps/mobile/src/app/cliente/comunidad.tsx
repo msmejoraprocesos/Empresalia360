@@ -6,7 +6,7 @@ import { Pattern } from '@/components/pattern-background';
 import { LookingForSwitch } from '@/components/looking-for';
 import { AskForm, QuestionCard } from '@/components/questions';
 import { WORLD } from '@/constants/world';
-import { categoryBySlug, getBusiness } from '@/data';
+import { categoryBySlug, getBusiness, inWorld as bizInWorld } from '@/data';
 import { Card, EmptyState, Header, Segmented } from '@/components/ui';
 import { Brand, Radius, TabBarSpace } from '@/constants/theme';
 import { useApp } from '@/store/app';
@@ -24,7 +24,7 @@ export default function Comunidad() {
   const [filter, setFilter] = useState<FeedFilter>('todos');
   const lf = state.lookingFor;
   const inWorld = (catSlug?: string) => categoryBySlug(catSlug ?? '')?.group === lf;
-  const posts = state.posts.filter((p) => (filter === 'todos' || p.kind === filter) && inWorld(getBusiness(p.businessSlug)?.categorySlug));
+  const posts = state.posts.filter((p) => (filter === 'todos' || p.kind === filter) && bizInWorld(getBusiness(p.businessSlug), lf));
   const questions = state.questions.filter((q) => inWorld(q.categorySlug));
   const level = [...LEVELS].reverse().find((l) => state.points >= l.min) ?? LEVELS[0];
   const next = LEVELS[LEVELS.indexOf(level) + 1];

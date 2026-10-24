@@ -8,8 +8,40 @@ export function getBusiness(slug: string | undefined): Business | undefined {
   return BUSINESSES.find((b) => b.slug === slug);
 }
 
+/** Todas las categorías del experto: la principal primero, luego las demás */
+export function categoriesOf(b: Business): string[] {
+  return Array.from(new Set([b.categorySlug, ...(b.categorySlugs ?? [])]));
+}
+
+export const inCategory = (b: Business, slug: string) => categoriesOf(b).includes(slug);
+
+/** ¿Aparece en este mundo? (un experto puede estar en los dos si tiene categorías de ambos) */
+export function inWorld(b: Business | undefined, world: 'profesionales' | 'oficios'): boolean {
+  return Boolean(b && categoriesOf(b).some((s) => CATEGORIES.find((c) => c.slug === s)?.group === world));
+}
+
+/** La categoría con la que se muestra en un mundo (o la elegida en un filtro) */
+export function categoryFor(b: Business, world?: 'profesionales' | 'oficios', preferred?: string | null): Category | undefined {
+  const cats = categoriesOf(b).map((s) => CATEGORIES.find((c) => c.slug === s)).filter((c): c is Category => Boolean(c));
+  return (preferred && cats.find((c) => c.slug === preferred)) || (world && cats.find((c) => c.group === world)) || cats[0];
+}
+
+/** Categoría a la que pertenece una especialidad (las que el experto escribe a mano no tienen) */
+export function specialtyCategory(name: string): string | undefined {
+  return CATEGORIES.find((c) => c.specialties.some((s) => s.name === name))?.slug;
+}
+
+/** Especialidades que se muestran en un mundo: las de sus categorías de ese mundo y las escritas a mano */
+export function specialtiesIn(b: Business, world?: 'profesionales' | 'oficios'): string[] {
+  if (!world) return b.specialties;
+  return b.specialties.filter((s) => {
+    const c = specialtyCategory(s);
+    return !c || CATEGORIES.find((x) => x.slug === c)?.group === world;
+  });
+}
+
 export function businessesInCategory(slug: string): Business[] {
-  return BUSINESSES.filter((b) => b.categorySlug === slug);
+  return BUSINESSES.filter((b) => inCategory(b, slug));
 }
 
 export const ATTEND_LABEL: Record<Attend, string> = {
@@ -58,18 +90,18 @@ export function searchProfessionals(q: string, f: SearchFilters = {}): Business[
   const t = norm(q);
   const matchedSpecialties = new Set(specialtiesFor(q).map((m) => m.specialty));
   let list = BUSINESSES.filter((b) => {
-    if (f.category && b.categorySlug !== f.category) return false;
+    if (f.category && !inCategory(b, f.category)) return false;
     if (f.specialty && !b.specialties.includes(f.specialty)) return false;
     if (f.attend && !b.attends.includes(f.attend)) return false;
     if (f.verified && !b.verified) return false;
     if (f.freeConsult && b.consultPrice !== 0) return false;
     if (!t) return true;
-    const cat = CATEGORIES.find((c) => c.slug === b.categorySlug);
+    const cats = CATEGORIES.filter((c) => inCategory(b, c.slug));
     return (
       norm(b.name).includes(t) ||
       norm(b.profession).includes(t) ||
       norm(b.description).includes(t) ||
-      (cat && (norm(cat.name).includes(t) || norm(cat.professional).includes(t))) ||
+      cats.some((cat) => norm(cat.name).includes(t) || norm(cat.professional).includes(t)) ||
       b.specialties.some((s) => matchedSpecialties.has(s) || norm(s).includes(t)) ||
       b.items.some((i) => norm(i.name).includes(t))
     );
@@ -96,7 +128,7 @@ export function distanceTo(b: Business): number {
 }
 
 export function countInCategory(slug: string): number {
-  return BUSINESSES.filter((b) => b.categorySlug === slug).length;
+  return BUSINESSES.filter((b) => inCategory(b, slug)).length;
 }
 
 /** Acción principal del perfil según lo que ofrece el profesional. */

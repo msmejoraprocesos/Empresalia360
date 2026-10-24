@@ -30,6 +30,7 @@ create table if not exists public.specialties (
 alter table public.businesses
   add column if not exists profession text,
   add column if not exists specialties text[] not null default '{}',
+  add column if not exists extra_categories text[] not null default '{}', -- otras categorías (slugs) donde también aparece
   add column if not exists years_exp int not null default 0 check (years_exp >= 0),
   add column if not exists license text,              -- cédula profesional o certificación
   add column if not exists education text,
@@ -45,6 +46,7 @@ alter table public.businesses
   add column if not exists accepts_new boolean not null default true;
 
 create index if not exists businesses_specialties_idx on public.businesses using gin (specialties);
+create index if not exists businesses_extra_categories_idx on public.businesses using gin (extra_categories);
 
 -- Galería de trabajos o del despacho
 create table if not exists public.business_photos (

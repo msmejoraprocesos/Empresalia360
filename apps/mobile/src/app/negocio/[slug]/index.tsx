@@ -13,7 +13,7 @@ import { PostCard } from '@/components/community-feed';
 import { Pattern } from '@/components/pattern-background';
 import { BottomBar, Button, Card, Chip, EmptyState, IconCircle, RoundIconButton, Segmented, Stars } from '@/components/ui';
 import { Brand, Radius, ShadowStrong } from '@/constants/theme';
-import { ATTEND_LABEL, categoryBySlug, distanceTo, getBusiness, primaryAction, specialtyEmoji } from '@/data';
+import { ATTEND_LABEL, categoriesOf, categoryBySlug, distanceTo, getBusiness, primaryAction, specialtyEmoji } from '@/data';
 import { markSource, track, useBusinessScreen } from '@/lib/analytics';
 import { distance, money } from '@/lib/format';
 import { useApp } from '@/store/app';
@@ -122,6 +122,23 @@ export default function PerfilProfesional() {
               </View>
             ))}
           </View>
+
+          {categoriesOf(b).length > 1 ? (
+            <View style={{ gap: 6, marginTop: 10 }}>
+              <Text style={styles.statLabel}>Lo encuentras en</Text>
+              <View style={styles.chips}>
+                {categoriesOf(b).map((s) => {
+                  const c = categoryBySlug(s);
+                  return c ? (
+                    <Pressable key={s} accessibilityRole="link" onPress={() => router.push(`/categoria/${s}`)} style={[styles.spec, { borderWidth: 1, borderColor: c.color }]}>
+                      <Emoji name={c.emoji} size={18} />
+                      <Text style={styles.specText}>{c.name}</Text>
+                    </Pressable>
+                  ) : null;
+                })}
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.attends}>
             {b.attends.map((a) => (

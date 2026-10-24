@@ -116,7 +116,10 @@ export type Business = {
   id: string;
   slug: string;
   name: string;
+  /** Categoría principal (color del pin y del perfil) */
   categorySlug: string;
+  /** Otras categorías donde también aparece (un despacho con contabilidad y consultoría, una constructora…) */
+  categorySlugs?: string[];
   subtitle: string;
   description: string;
   address: string;

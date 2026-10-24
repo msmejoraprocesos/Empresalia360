@@ -15,7 +15,7 @@ import { AVATARS } from '@/constants/avatars';
 import type { EmojiName } from '@/constants/emoji';
 import { Brand, Radius, Shadow, TabBarSpace } from '@/constants/theme';
 import { WORLD } from '@/constants/world';
-import { CATEGORIES, getBusiness, PROMOTIONS, searchProfessionals } from '@/data';
+import { CATEGORIES, getBusiness, inWorld, PROMOTIONS, searchProfessionals } from '@/data';
 import type { Category } from '@/data/types';
 import { markSource } from '@/lib/analytics';
 import { greeting } from '@/lib/format';
@@ -91,14 +91,13 @@ export default function Inicio() {
   const lf = state.lookingFor;
   const world = WORLD[lf];
   const cats = CATEGORIES.filter((c) => c.group === lf);
-  const inGroup = (slug: string) => CATEGORIES.find((c) => c.slug === slug)?.group === lf;
   const featured = getBusiness(lf === 'oficios' ? 'plomeria-hernandez' : 'despacho-contable-reyes');
   const top = searchProfessionals('', { sort: 'relevancia' })
-    .filter((b) => inGroup(b.categorySlug) && b.slug !== featured?.slug)
+    .filter((b) => inWorld(b, lf) && b.slug !== featured?.slug)
     .slice(0, 3);
   const freq = FREQUENT.filter((f) => f.g === lf);
   const upcoming = state.orders.find((o) => o.type === 'cita' && o.status === 'confirmada');
-  const posts = state.posts.filter((p) => inGroup(getBusiness(p.businessSlug)?.categorySlug ?? '')).slice(0, 2);
+  const posts = state.posts.filter((p) => inWorld(getBusiness(p.businessSlug), lf)).slice(0, 2);
   void state.profileVersion;
 
   return (
@@ -207,7 +206,7 @@ export default function Inicio() {
           <SectionTitle title="Promociones" action="Mis regalos" onAction={() => router.push('/lealtad')} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-          {PROMOTIONS.filter((p) => !p.businessSlug || inGroup(getBusiness(p.businessSlug)?.categorySlug ?? '')).map((p) => {
+          {PROMOTIONS.filter((p) => !p.businessSlug || inWorld(getBusiness(p.businessSlug), lf)).map((p) => {
             const st = PROMO_STYLE[p.kind];
             return (
               <Pressable

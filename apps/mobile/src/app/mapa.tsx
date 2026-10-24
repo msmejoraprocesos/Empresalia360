@@ -10,7 +10,7 @@ import { BusinessMap } from '@/components/business-map';
 import { Emoji } from '@/components/emoji';
 import { Button, Chip, RoundIconButton } from '@/components/ui';
 import { Brand, Radius, Shadow, ShadowStrong } from '@/constants/theme';
-import { BUSINESSES, CATEGORIES, distanceTo, getBusiness, primaryAction } from '@/data';
+import { BUSINESSES, CATEGORIES, categoryFor, distanceTo, inCategory, primaryAction } from '@/data';
 import { markSource } from '@/lib/analytics';
 import { distance } from '@/lib/format';
 import { WORLD } from '@/constants/world';
@@ -47,11 +47,11 @@ export default function Mapa() {
   }, []);
 
   const cats = CATEGORIES.filter((c) => c.group === group);
+  // Un experto con varias categorías sale en cada una; su pin toma el color de la categoría que se está viendo
   const list = BUSINESSES.filter(
-    (x) => cats.some((c) => c.slug === x.categorySlug) && (!cat || x.categorySlug === cat) && (!urgent || x.urgent24) && (!openNow || x.isOpen),
-  );
-  const b = getBusiness(selected);
-  const shown = b && list.includes(b) ? b : undefined;
+    (x) => cats.some((c) => inCategory(x, c.slug)) && (!cat || inCategory(x, cat)) && (!urgent || x.urgent24) && (!openNow || x.isOpen),
+  ).map((x) => ({ ...x, categorySlug: categoryFor(x, group, cat)?.slug ?? x.categorySlug }));
+  const shown = list.find((x) => x.slug === selected);
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
@@ -110,7 +110,7 @@ export default function Mapa() {
                 <View style={[styles.legendPin, { backgroundColor: c.color === Brand.line ? Brand.inkSoft : c.color }]} />
                 <Emoji name={c.emoji} size={22} />
                 <Text style={styles.legendText}>{c.name}</Text>
-                <Text style={styles.legendCount}>{BUSINESSES.filter((x) => x.categorySlug === c.slug).length}</Text>
+                <Text style={styles.legendCount}>{BUSINESSES.filter((x) => inCategory(x, c.slug)).length}</Text>
               </View>
             ))}
           </View>

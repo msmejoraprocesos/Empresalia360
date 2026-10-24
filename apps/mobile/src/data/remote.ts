@@ -24,6 +24,8 @@ type Row = {
   lng: number | null;
   profession: string | null;
   specialties: string[] | null;
+  extra_categories: string[] | null;
+  plan: string | null;
   years_exp: number | null;
   license: string | null;
   education: string | null;
@@ -63,7 +65,7 @@ type Row = {
 const SELECT = `
   id, slug, name, subtitle, description, address, phone, whatsapp, is_open, delivers, verified, promo,
   rating_avg, rating_count, lat, lng,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time,
+  profession, specialties, extra_categories, plan, years_exp, license, education, languages, attends, consult_price, response_time,
   directions, urgent24, warranty, payment_info, logo_url, cover_url, available,
   business_photos ( id, url, caption, color, position ),
   categories ( slug ),
@@ -110,6 +112,8 @@ function toBusiness(r: Row): Business {
     slug: r.slug,
     name: r.name,
     categorySlug: r.categories?.slug ?? 'abogados',
+    // Con plan Básico (o suspendido) solo cuenta la categoría principal
+    categorySlugs: r.plan && r.plan !== 'basico' ? (r.extra_categories ?? []) : [],
     subtitle: r.subtitle ?? '',
     description: r.description ?? '',
     address: r.address ?? '',
@@ -551,6 +555,7 @@ export async function saveBusiness(current: Business, patch: Partial<Business>, 
   const fields = {
     name: next.name, subtitle: next.subtitle, description: next.description, category_id: cat.data?.id ?? null, zone_id: zone.data?.id ?? null,
     phone: next.phone, whatsapp: next.phone, address: next.address, profession: next.profession, specialties: next.specialties,
+    extra_categories: (next.categorySlugs ?? []).filter((s) => s !== next.categorySlug),
     years_exp: next.yearsExp || 0, license: next.license ?? null, education: next.education ?? null, languages: next.languages, attends: next.attends,
     consult_price: next.consultPrice ?? null, response_time: next.responseTime ?? null, directions: next.references ?? null,
     urgent24: Boolean(next.urgent24), warranty: next.warranty ?? null, payment_info: next.paymentInfo ?? null,

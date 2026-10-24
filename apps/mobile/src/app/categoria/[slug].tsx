@@ -54,7 +54,7 @@ export default function Categoria() {
         </ScrollView>
         <View style={{ paddingHorizontal: 16, gap: 10 }}>
           {list.map((b) => (
-            <BusinessCard key={b.slug} business={b} source="categoria" highlight={specialty} />
+            <BusinessCard key={b.slug} business={b} source="categoria" highlight={specialty} categorySlug={cat.slug} />
           ))}
           {list.length === 0 ? (
             <EmptyState icon="people-outline" title="Aún no hay expertos aquí" text="Pronto se sumarán más. Mientras, prueba con otra especialidad." />

@@ -5,11 +5,12 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AVATARS } from '@/constants/avatars';
 import type { EmojiName } from '@/constants/emoji';
 import { Brand, Radius, Shadow } from '@/constants/theme';
-import { ATTEND_LABEL, categoryBySlug, distanceTo, initials, primaryAction, specialtyEmoji } from '@/data';
+import { ATTEND_LABEL, categoriesOf, categoryBySlug, categoryFor, distanceTo, initials, primaryAction, specialtiesIn, specialtyCategory, specialtyEmoji } from '@/data';
 import type { Attend, Business } from '@/data/types';
 import type { Source } from '@/data/stats';
 import { markSource, track } from '@/lib/analytics';
 import { distance, money } from '@/lib/format';
+import { useApp } from '@/store/app';
 
 import { Emoji } from './emoji';
 import { Stars } from './ui';
@@ -17,8 +18,8 @@ import { Stars } from './ui';
 export const ATTEND_EMOJI: Record<Attend, EmojiName> = { despacho: 'edificio', en_linea: 'laptop', domicilio: 'casa' };
 
 /** Foto del experto; si no subió una, su cara ilustrada o sus iniciales. Lleva el dibujo de su oficio. */
-export function ProAvatar({ business, size = 60, badge = true }: { business: Business; size?: number; badge?: boolean }) {
-  const cat = categoryBySlug(business.categorySlug);
+export function ProAvatar({ business, size = 60, badge = true, categorySlug }: { business: Business; size?: number; badge?: boolean; categorySlug?: string }) {
+  const cat = categoryBySlug(categorySlug ?? business.categorySlug);
   const bg = cat?.color === Brand.line ? Brand.inkSoft : cat?.color ?? Brand.chile;
   const art = AVATARS[business.slug];
   const r = size * 0.32;
@@ -54,7 +55,10 @@ export function BusinessCard({
   sponsored,
   source = 'otro',
   highlight,
+  categorySlug,
 }: {
+  /** Categoría que se está viendo (en la pantalla de una categoría) */
+  categorySlug?: string;
   business: Business;
   sponsored?: boolean;
   source?: Source;
@@ -62,7 +66,13 @@ export function BusinessCard({
   highlight?: string;
 }) {
   const router = useRouter();
-  const specs = highlight && business.specialties.includes(highlight) ? [highlight, ...business.specialties.filter((s) => s !== highlight)] : business.specialties;
+  const { state } = useApp();
+  // En cada mundo se muestra con la categoría y especialidades de ese mundo
+  const cat = categoryFor(business, state.lookingFor, categorySlug);
+  // Primero las especialidades de la categoría que se está viendo
+  const own = [...specialtiesIn(business, cat?.group ?? state.lookingFor)].sort((x, y) => Number(specialtyCategory(y) === cat?.slug) - Number(specialtyCategory(x) === cat?.slug));
+  const specs = highlight && own.includes(highlight) ? [highlight, ...own.filter((s) => s !== highlight)] : own;
+  const others = categoriesOf(business).filter((s) => s !== cat?.slug).map((s) => categoryBySlug(s)?.name).filter(Boolean);
   const consult = consultLabel(business);
   const action = primaryAction(business);
   const go = () => {
@@ -79,7 +89,7 @@ export function BusinessCard({
         </View>
       ) : null}
       <View style={styles.row}>
-        <ProAvatar business={business} size={72} />
+        <ProAvatar business={business} size={72} categorySlug={cat?.slug} />
         <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Text style={styles.name} numberOfLines={1}>
@@ -88,9 +98,14 @@ export function BusinessCard({
             {business.verified ? <Emoji name="palomita" size={16} label="Verificado" /> : null}
           </View>
           <Text style={styles.sub} numberOfLines={1}>
-            {business.profession}
+            {cat && cat.slug !== business.categorySlug ? `${cat.name} · ${business.profession}` : business.profession}
             {business.yearsExp ? ` · ${business.yearsExp} años` : ''}
           </Text>
+          {others.length ? (
+            <Text style={styles.also} numberOfLines={1}>
+              También: {others.join(', ')}
+            </Text>
+          ) : null}
           <View style={styles.metaRow}>
             <Stars rating={business.rating} size={15} />
             <Text style={styles.rating}>{business.rating.toFixed(1)}</Text>
@@ -172,6 +187,7 @@ export function Tag({ emoji, text, bg, fg }: { emoji: EmojiName; text: string; b
 }
 
 const styles = StyleSheet.create({
+  also: { fontSize: 12, fontWeight: '700', color: '#8A6A12' },
   card: { backgroundColor: Brand.white, borderRadius: Radius.lg, padding: 14, gap: 10 },
   row: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   badge: { position: 'absolute', backgroundColor: Brand.white, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Brand.white, ...Shadow },
