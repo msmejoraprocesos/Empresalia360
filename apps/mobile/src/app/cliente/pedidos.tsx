@@ -100,7 +100,7 @@ export default function Pedidos() {
         {list.length === 0 && (tab === 'hechos' || pendingQuotes.length === 0) ? (
           <EmptyState
             icon="receipt-outline"
-            title={tab === 'curso' ? 'Nada en curso' : 'Aún no hay pedidos completados'}
+            title={tab === 'curso' ? 'Nada en curso' : 'Aún no hay citas atendidas'}
             text="Cuando ordenes, reserves o pidas una cotización, lo verás aquí."
           />
         ) : null}

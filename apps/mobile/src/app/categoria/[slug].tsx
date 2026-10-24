@@ -1,41 +1,58 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BusinessCard } from '@/components/business-card';
-import { EmptyState, Header, OptionPill } from '@/components/ui';
-import { Brand } from '@/constants/theme';
-import { businessesInCategory, categoryBySlug, distanceTo } from '@/data';
-
-type Filter = 'todos' | 'abierto' | 'promo' | 'cerca';
+import { EmptyState, Header } from '@/components/ui';
+import { Brand, Radius } from '@/constants/theme';
+import { categoryBySlug, searchProfessionals } from '@/data';
+import { useApp } from '@/store/app';
 
 export default function Categoria() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { state } = useApp();
+  const [specialty, setSpecialty] = useState<string>();
   const cat = categoryBySlug(slug);
-  const [filter, setFilter] = useState<Filter>('todos');
-  let list = businessesInCategory(slug);
-  if (filter === 'abierto') list = list.filter((b) => b.isOpen);
-  if (filter === 'promo') list = list.filter((b) => b.promo);
-  if (filter === 'cerca') list = [...list].sort((a, b) => distanceTo(a) - distanceTo(b));
-  else list = [...list].sort((a, b) => b.rating - a.rating);
+  void state.profileVersion;
+  if (!cat) return <EmptyState icon="grid-outline" title="Categoría no encontrada" text="" />;
 
-  const headerColor = cat && cat.color !== Brand.line && cat.color !== Brand.mango ? cat.color : Brand.chile;
+  const list = searchProfessionals('', { category: cat.slug, specialty });
+  const headerColor = cat.color === Brand.line || cat.color === Brand.mango ? Brand.chile : cat.color;
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
-      <Header title={cat?.name ?? 'Categoría'} subtitle={`${list.length} en tu zona`} color={headerColor} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ padding: 16, gap: 8 }}>
-        <OptionPill label="Todos" selected={filter === 'todos'} onPress={() => setFilter('todos')} />
-        <OptionPill label="Abierto ahora" selected={filter === 'abierto'} onPress={() => setFilter('abierto')} />
-        <OptionPill label="Con promoción" selected={filter === 'promo'} onPress={() => setFilter('promo')} />
-        <OptionPill label="Más cerca" selected={filter === 'cerca'} onPress={() => setFilter('cerca')} />
-      </ScrollView>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, gap: 10 }}>
-        {list.map((b) => (
-          <BusinessCard key={b.slug} business={b} source="categoria" />
-        ))}
-        {list.length === 0 ? <EmptyState icon="storefront-outline" title="Nada por aquí" text="Prueba con otro filtro." /> : null}
+      <Header title={cat.name} subtitle={`${searchProfessionals('', { category: cat.slug }).length} en Querétaro`} color={headerColor} />
+      <ScrollView contentContainerStyle={{ paddingBottom: 40, gap: 12, paddingTop: 14 }}>
+        <Text style={styles.label}>Especialidades</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+          <Pressable accessibilityRole="button" onPress={() => setSpecialty(undefined)} style={[styles.pill, !specialty && styles.pillOn]}>
+            <Text style={[styles.pillText, !specialty && { color: Brand.white }]}>Todas</Text>
+          </Pressable>
+          {cat.specialties.map((s) => {
+            const on = specialty === s.name;
+            return (
+              <Pressable key={s.name} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setSpecialty(on ? undefined : s.name)} style={[styles.pill, on && styles.pillOn]}>
+                <Text style={[styles.pillText, on && { color: Brand.white }]}>{s.name}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <View style={{ paddingHorizontal: 16, gap: 10 }}>
+          {list.map((b) => (
+            <BusinessCard key={b.slug} business={b} source="categoria" highlight={specialty} />
+          ))}
+          {list.length === 0 ? (
+            <EmptyState icon="people-outline" title="Aún no hay expertos aquí" text="Pronto se sumarán más. Mientras, prueba con otra especialidad." />
+          ) : null}
+        </View>
       </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  label: { fontSize: 13, fontWeight: '800', color: Brand.inkSoft, textTransform: 'uppercase', letterSpacing: 0.4, paddingHorizontal: 16 },
+  pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1, borderColor: Brand.line, backgroundColor: Brand.white },
+  pillOn: { backgroundColor: Brand.chile, borderColor: Brand.chile },
+  pillText: { fontSize: 13, fontWeight: '700', color: Brand.ink },
+});

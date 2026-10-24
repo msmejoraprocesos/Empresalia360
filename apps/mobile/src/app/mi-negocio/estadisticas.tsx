@@ -32,7 +32,6 @@ function duration(seconds: number) {
 }
 
 function conversionLabel(b: Business) {
-  if (b.modules.includes('ordenar')) return { verb: 'Contrataron', noun: 'contrataciones' };
   if (b.modules.includes('reservar')) return { verb: 'Reservaron una cita', noun: 'citas' };
   return { verb: 'Pidieron cotización', noun: 'cotizaciones' };
 }
@@ -264,14 +263,14 @@ export default function Estadisticas() {
             </View>
             <BarRow label="Vieron tu negocio" value={stats.funnel.visitors} max={stats.funnel.visitors} right={n(stats.funnel.visitors)} />
             <BarRow
-              label={business.modules.includes('ordenar') ? 'Vieron tus servicios' : 'Vieron tus servicios'}
+              label="Vieron tus servicios"
               value={stats.funnel.catalog}
               max={stats.funnel.visitors}
               right={n(stats.funnel.catalog)}
               sub={`${pct(stats.funnel.catalog, stats.funnel.visitors)}% de quienes entraron`}
             />
             <BarRow
-              label={business.modules.includes('ordenar') ? 'Eligieron un producto' : 'Eligieron un servicio'}
+              label="Eligieron un servicio"
               value={stats.funnel.selected}
               max={stats.funnel.visitors}
               right={n(stats.funnel.selected)}

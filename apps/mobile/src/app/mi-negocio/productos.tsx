@@ -8,8 +8,8 @@ import { money } from '@/lib/format';
 import { useApp } from '@/store/app';
 
 const KIND: Record<string, { label: string; bg: string; fg: string }> = {
-  producto: { label: 'Producto', bg: Brand.chileSoft, fg: Brand.chileDark },
-  cita: { label: 'Con cita', bg: Brand.albercaSoft, fg: '#1757B8' },
+  producto: { label: 'Paquete', bg: Brand.chileSoft, fg: Brand.chileDark },
+  cita: { label: 'Consulta o visita', bg: Brand.albercaSoft, fg: '#1757B8' },
   cotizacion: { label: 'Cotización', bg: Brand.jacarandaSoft, fg: Brand.jacaranda },
 };
 
@@ -19,7 +19,7 @@ export default function Productos() {
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
-      <Header title="Productos y servicios" subtitle={`${state.myItems.length} en tu catálogo`} color={Brand.ink} />
+      <Header title="Mis servicios" subtitle={`${state.myItems.length} publicados en tu perfil`} color={Brand.ink} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 130 }}>
         {state.myItems.map((it) => (
           <Card key={it.id} style={styles.row}>
@@ -39,13 +39,13 @@ export default function Productos() {
                 trackColor={{ true: Brand.nopal, false: '#C5CEDC' }}
                 thumbColor={Brand.white}
               />
-              <Text style={styles.sub}>{it.available ? 'Disponible' : 'Agotado'}</Text>
+              <Text style={styles.sub}>{it.available ? 'Visible' : 'Oculto'}</Text>
             </View>
           </Card>
         ))}
       </ScrollView>
       <BottomBar>
-        <Button label="Agregar producto o servicio" icon="add" onPress={() => router.push('/mi-negocio/producto-nuevo')} />
+        <Button label="Agregar servicio" icon="add" onPress={() => router.push('/mi-negocio/producto-nuevo')} />
       </BottomBar>
     </View>
   );

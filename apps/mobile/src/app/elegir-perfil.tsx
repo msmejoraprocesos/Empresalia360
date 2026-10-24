@@ -9,9 +9,8 @@ import type { IconName, Role } from '@/data/types';
 import { useApp } from '@/store/app';
 
 const ROLES: { id: Role; label: string; sub: string; icon: IconName; color: string; soft: string; ink: string }[] = [
-  { id: 'vecino', label: 'Busco un experto', sub: 'Quiero agendar, cotizar y contratar profesionales', icon: 'person', color: Brand.chile, soft: Brand.chileSoft, ink: Brand.chileDark },
-  { id: 'negocio', label: 'Soy profesional', sub: 'Quiero clientes, agenda, cobros y reseñas', icon: 'briefcase', color: Brand.nopal, soft: Brand.nopalSoft, ink: Brand.nopalDark },
-  { id: 'repartidor', label: 'Soy mensajero', sub: 'Quiero llevar documentos entre despachos', icon: 'document-attach', color: Brand.alberca, soft: Brand.albercaSoft, ink: '#1757B8' },
+  { id: 'vecino', label: 'Busco un experto', sub: 'Quiero encontrar a quien me ayude, ver reseñas y agendar', icon: 'person', color: Brand.chile, soft: Brand.chileSoft, ink: Brand.chileDark },
+  { id: 'negocio', label: 'Soy profesional u oficio', sub: 'Crear mi perfil con mis especialidades y recibir clientes', icon: 'briefcase', color: Brand.nopal, soft: Brand.nopalSoft, ink: Brand.nopalDark },
 ];
 
 export default function ElegirPerfil() {
@@ -56,7 +55,7 @@ export default function ElegirPerfil() {
           label="Continuar"
           onPress={() => {
             actions.setRole(role);
-            router.replace(role === 'vecino' ? '/cliente' : role === 'negocio' ? '/panel' : '/repartidor');
+            router.replace(role === 'negocio' ? '/mi-negocio/perfil' : '/cliente');
           }}
         />
       </BottomBar>

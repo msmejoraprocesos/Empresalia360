@@ -7,6 +7,5 @@ export default function Entry() {
   const { state } = useApp();
   if (state.role === 'vecino') return <Redirect href="/cliente" />;
   if (state.role === 'negocio') return <Redirect href="/panel" />;
-  if (state.role === 'repartidor') return <Redirect href="/repartidor" />;
   return <Redirect href="/bienvenida" />;
 }

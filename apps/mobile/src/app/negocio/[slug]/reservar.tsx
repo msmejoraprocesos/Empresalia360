@@ -66,7 +66,7 @@ export default function Reservar() {
                   <Text style={styles.serviceName}>{s.name}</Text>
                   <Text style={styles.text}>{s.durationMin} min</Text>
                 </View>
-                <Text style={styles.serviceName}>{money(s.price ?? 0)}</Text>
+                <Text style={styles.serviceName}>{s.price ? money(s.price) : 'Sin costo'}</Text>
               </Card>
             </Pressable>
           ))}
@@ -131,7 +131,7 @@ export default function Reservar() {
         ) : null}
         <View style={styles.line}>
           <Text style={styles.total}>Total en consulta</Text>
-          <Text style={styles.total}>{money(total)}</Text>
+          <Text style={styles.total}>{total ? money(total) : 'Sin costo'}</Text>
         </View>
         <Button
           label={`Confirmar · ${label}`}

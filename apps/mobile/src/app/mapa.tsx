@@ -72,10 +72,11 @@ export default function Mapa() {
                 <Text style={styles.sub}>· {b.ratingCount} reseñas</Text>
               </View>
               <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                {b.modules.includes('ordenar') ? <Chip label="Contratación en línea" /> : null}
-                {b.delivers ? <Chip label="A domicilio" /> : null}
-                {b.modules.includes('reservar') ? <Chip label="Con cita" /> : null}
-                {b.modules.includes('cotizar') ? <Chip label="Cotiza" /> : null}
+                {b.specialties.slice(0, 2).map((s) => (
+                  <Chip key={s} label={s} color={Brand.chileSoft} ink={Brand.chileDark} />
+                ))}
+                {b.attends.includes('domicilio') ? <Chip label="A domicilio" /> : null}
+                {b.attends.includes('en_linea') ? <Chip label="En línea" /> : null}
               </View>
             </View>
           </View>
@@ -86,11 +87,11 @@ export default function Mapa() {
               }}
             />
             <Button
-              label={primaryAction(b).module === 'ordenar' ? 'Contratar' : primaryAction(b).module === 'reservar' ? 'Reservar' : 'Cotizar'}
+              label={primaryAction(b).module === 'reservar' ? 'Agendar' : 'Cotizar'}
               style={{ flex: 1.4 }}
               onPress={() => {
                 const a = primaryAction(b).module;
-                router.push(a === 'ordenar' ? `/negocio/${b.slug}/menu` : a === 'reservar' ? `/negocio/${b.slug}/reservar` : `/negocio/${b.slug}/cotizar`);
+                router.push(a === 'reservar' ? `/negocio/${b.slug}/reservar` : `/negocio/${b.slug}/cotizar`);
               }}
             />
           </View>

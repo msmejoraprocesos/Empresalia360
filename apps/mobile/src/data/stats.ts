@@ -239,7 +239,7 @@ export function sampleEvents(b: Business, now = Date.now()): StatEvent[] {
   const rand = seeded(b.slug);
   const base = 14 + Math.min(30, b.ratingCount / 6);
   const pool = Math.round(base * 9);
-  const conversion = b.modules.includes('ordenar') ? 'pedido' : b.modules.includes('reservar') ? 'reserva' : 'cotizacion';
+  const conversion = b.modules.includes('reservar') ? 'reserva' : 'cotizacion';
   const selectable = b.items.filter((i) => i.available);
   const events: StatEvent[] = [];
   const hasAd = OPENING_ADS.some((a) => a.businessSlug === b.slug);

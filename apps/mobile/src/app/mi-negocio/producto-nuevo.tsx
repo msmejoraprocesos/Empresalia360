@@ -10,15 +10,14 @@ import { uploadPhoto } from '@/lib/photos';
 import { myBusiness, useApp } from '@/store/app';
 
 const KINDS: { value: CatalogKind; label: string; hint: string }[] = [
-  { value: 'producto', label: 'Producto', hint: 'Se ordena y paga' },
-  { value: 'cita', label: 'Servicio con cita', hint: 'Se reserva' },
-  { value: 'cotizacion', label: 'Cotización', hint: 'Precio por caso' },
+  { value: 'cita', label: 'Consulta o visita', hint: 'El cliente agenda una cita' },
+  { value: 'cotizacion', label: 'Servicio a cotizar', hint: 'Precio según el caso' },
 ];
 
 export default function ProductoNuevo() {
   const router = useRouter();
   const { actions } = useApp();
-  const [kind, setKind] = useState<CatalogKind>('producto');
+  const [kind, setKind] = useState<CatalogKind>('cita');
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [extra, setExtra] = useState('');
@@ -33,11 +32,11 @@ export default function ProductoNuevo() {
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
-      <Header title="Agregar al catálogo" color={Brand.ink} />
+      <Header title="Agregar servicio" color={Brand.ink} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
-        <PhotoPicker label="Foto del producto" value={photo} onChange={setPhoto} />
+        <PhotoPicker label="Foto (opcional)" value={photo} onChange={setPhoto} />
 
-        <Text style={styles.label}>¿Cómo lo vendes?</Text>
+        <Text style={styles.label}>¿Cómo lo ofreces?</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {KINDS.map((k) => {
             const on = k.value === kind;
@@ -60,7 +59,7 @@ export default function ProductoNuevo() {
               <Field label={extraLabel} value={extra} onChangeText={setExtra} placeholder={kind === 'cita' ? '40' : kind === 'cotizacion' ? '24 h' : '15 min'} />
             </View>
           </View>
-          <Field label="Sección del catálogo" value={section} onChangeText={setSection} placeholder="Paquetes, Trámites, Asesoría…" />
+          <Field label="Especialidad o sección" value={section} onChangeText={setSection} placeholder="Paquetes, Trámites, Asesoría…" />
           <Field label="Descripción (opcional)" value={description} onChangeText={setDescription} multiline />
         </Card>
         <Card style={{ paddingVertical: 4 }}>
@@ -68,8 +67,8 @@ export default function ProductoNuevo() {
             icon="checkmark-circle-outline"
             iconBg={Brand.nopalSoft}
             iconColor={Brand.nopalDark}
-            title="Disponible hoy"
-            subtitle="Apágalo si se agota"
+            title="Visible en mi perfil"
+            subtitle="Apágalo si por ahora no lo ofreces"
             value={available}
             onChange={() => setAvailable(!available)}
             last

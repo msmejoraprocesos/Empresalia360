@@ -20,8 +20,8 @@ export default function Espacios() {
   const [units, setUnits] = useState(1);
   const [bought, setBought] = useState(false);
   const [headline, setHeadline] = useState(myBusiness.promo ?? '');
-  const [body, setBody] = useState('Solo enseñando la app en caja.');
-  const [cta, setCta] = useState(myBusiness.modules.includes('ordenar') ? 'Ver servicios' : 'Ver promoción');
+  const [body, setBody] = useState('Agenda desde Expertalia 360.');
+  const [cta, setCta] = useState('Agendar cita');
   const [color, setColor] = useState<string>(Brand.chile);
   const [adPhoto, setAdPhoto] = useState<string>();
   const [saving, setSaving] = useState(false);

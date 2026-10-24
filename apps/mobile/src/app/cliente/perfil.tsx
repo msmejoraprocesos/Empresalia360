@@ -29,33 +29,22 @@ export default function Perfil() {
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: TabBarSpace }}>
         <Card style={{ paddingVertical: 4 }}>
-          <ListRow icon="wallet-outline" iconBg={Brand.mangoSoft} iconColor="#7A5600" title="Mis tarjetas y cupones" subtitle={`${state.points.toLocaleString('es-MX')} puntos`} onPress={() => router.push('/lealtad')} />
-          <ListRow icon="people-outline" iconBg={Brand.nopalSoft} iconColor={Brand.nopalDark} title="Mi comunidad" subtitle="Nivel, Ruta del mes y eventos" onPress={() => router.push('/comunidad')} />
-          <ListRow icon="heart-outline" iconBg={Brand.bugambiliaSoft} iconColor={Brand.bugambilia} title="Favoritos" subtitle={favs.map((b) => b!.name).join(', ') || 'Aún no guardas negocios'} onPress={() => router.push('/cliente/explorar')} last />
+          <ListRow icon="calendar-outline" iconBg={Brand.albercaSoft} iconColor="#1757B8" title="Mis citas y cotizaciones" subtitle={`${state.orders.length} en tu historial`} onPress={() => router.push('/cliente/pedidos')} />
+          <ListRow icon="people-outline" iconBg={Brand.nopalSoft} iconColor={Brand.nopalDark} title="Comunidad" subtitle="Servicios, consejos y eventos" onPress={() => router.push('/cliente/comunidad')} />
+          <ListRow icon="heart-outline" iconBg={Brand.bugambiliaSoft} iconColor={Brand.bugambilia} title="Expertos guardados" subtitle={favs.map((b) => b!.name).join(', ') || 'Aún no guardas a nadie'} onPress={() => router.push('/cliente/explorar')} last />
         </Card>
 
         <Text style={styles.section}>Cambiar de modo</Text>
         <Card style={{ paddingVertical: 4 }}>
           <ListRow
-            icon="storefront-outline"
+            icon="briefcase-outline"
             iconBg={Brand.nopalSoft}
             iconColor={Brand.nopalDark}
-            title="Modo negocio"
-            subtitle="Vende, cobra y atiende tu negocio"
+            title="Soy profesional u oficio"
+            subtitle="Crea tu perfil y recibe clientes"
             onPress={() => {
               actions.setRole('negocio');
               router.replace('/panel');
-            }}
-          />
-          <ListRow
-            icon="bicycle-outline"
-            iconBg={Brand.albercaSoft}
-            iconColor="#1757B8"
-            title="Modo mensajero"
-            subtitle="Recibe envíos cerca de ti"
-            onPress={() => {
-              actions.setRole('repartidor');
-              router.replace('/repartidor');
             }}
           />
           <ListRow

@@ -8,14 +8,14 @@ import { shortDay } from '@/lib/format';
 type Slot = { time: string; who?: string; what?: string; source?: 'expertalia' | 'mostrador'; status?: 'confirmada' | 'sin_confirmar' | 'atendida' };
 
 const BASE: Slot[] = [
-  { time: '09:00', who: 'Jorge P.', what: 'Pastel de cumpleaños · recoger', source: 'mostrador', status: 'atendida' },
-  { time: '10:30' },
-  { time: '12:00', who: 'Laura M.', what: 'Pastel personalizado · recoger', source: 'expertalia', status: 'confirmada' },
-  { time: '13:30' },
-  { time: '16:00', who: 'Ana G.', what: 'Mesa para 4', source: 'expertalia', status: 'confirmada' },
-  { time: '17:30', who: 'Rodrigo M.', what: 'Mesa para 2', source: 'expertalia', status: 'sin_confirmar' },
-  { time: '19:00' },
-];
+  { time: '09:00', who: 'Jorge P.', what: 'Revisión de contrato de arrendamiento', source: 'mostrador', status: 'atendida' },
+  { time: '10:00', who: 'Ana G.', what: 'Consulta inicial · pensión alimenticia (en línea)', source: 'expertalia', status: 'confirmada' },
+  { time: '11:30' },
+  { time: '13:00', who: 'Pedro S.', what: 'Testamento · revisión de documentos', source: 'expertalia', status: 'confirmada' },
+  { time: '16:00' },
+  { time: '17:00', who: 'Rodrigo M.', what: 'Consulta inicial · divorcio', source: 'expertalia', status: 'sin_confirmar' },
+  { time: '18:00' },
+]
 
 export default function Agenda() {
   const [days] = useState(() => Array.from({ length: 6 }, (_, i) => new Date(Date.now() + i * 86400000)));

@@ -1,6 +1,6 @@
 # Expertalia 360
 
-App para abogados, contadores, notarías y otros profesionales. Por ahora funciona con datos de ejemplo (`apps/mobile/src/data/mock.ts`); solo se conecta a Supabase si se definen `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Antes del primer build en EAS: `cd apps/mobile && npx eas-cli@latest init`.
+Directorio de profesionales y oficios (abogados, contadores, notarías, psicólogos, arquitectos, plomeros, electricistas y más). Cada experto crea su perfil con especialidades, cédula y experiencia; los clientes lo encuentran describiendo su problema, ven reseñas y agendan o piden cotización. Incluye una comunidad donde los expertos anuncian servicios, consejos y eventos. Por ahora funciona con datos de ejemplo (`apps/mobile/src/data/mock.ts`); solo se conecta a Supabase si se definen `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Antes del primer build en EAS: `cd apps/mobile && npx eas-cli@latest init`.
 
 App móvil para micro y pequeños negocios y profesionales locales: catálogo, pedidos, reservas, cotizaciones, cobros en efectivo, tarjeta o transferencia, lealtad por número de celular, promociones, reseñas verificadas y mapa. Incluye una red entre negocios (proveedores y repartidores), espacios preferenciales de pago y un panel de administración.
 

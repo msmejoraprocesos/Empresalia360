@@ -26,13 +26,12 @@ export default function MiniSitio() {
 
   const links: { label: string; icon: IconName; onPress: () => void; style: 'primary' | 'light' | 'dark' }[] = [
     {
-      label: b.modules.includes('ordenar') ? 'Ver servicios y contratar' : b.modules.includes('reservar') ? 'Agendar cita' : 'Pedir cotización',
+      label: b.modules.includes('reservar') ? 'Agendar cita' : 'Pedir cotización',
       icon: 'storefront-outline',
       style: 'primary',
-      onPress: () => router.push((b.modules.includes('ordenar') ? `/negocio/${b.slug}/menu` : b.modules.includes('reservar') ? `/negocio/${b.slug}/reservar` : `/negocio/${b.slug}/cotizar`) as Href),
+      onPress: () => router.push((b.modules.includes('reservar') ? `/negocio/${b.slug}/reservar` : `/negocio/${b.slug}/cotizar`) as Href),
     },
     { label: 'Escríbenos por WhatsApp', icon: 'logo-whatsapp', style: 'light', onPress: () => Linking.openURL(`https://wa.me/${b.phone}`) },
-    { label: 'Mi tarjeta de sellos', icon: 'wallet-outline', style: 'dark', onPress: () => router.push('/lealtad') },
     { label: 'Cómo llegar', icon: 'location-outline', style: 'dark', onPress: () => router.push('/mapa') },
     { label: 'Déjanos tu reseña', icon: 'star-outline', style: 'dark', onPress: () => router.push(`/negocio/${b.slug}/resenas`) },
   ];

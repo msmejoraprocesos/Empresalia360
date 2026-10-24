@@ -4,17 +4,56 @@ import type Ionicons from '@expo/vector-icons/Ionicons';
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
 export type Role = 'vecino' | 'negocio' | 'repartidor';
-export type Module = 'ordenar' | 'reservar' | 'cotizar' | 'consulta';
+export type Module = 'reservar' | 'cotizar' | 'consulta';
+/** Dónde atiende el profesional */
+export type Attend = 'despacho' | 'en_linea' | 'domicilio';
 export type CatalogKind = 'producto' | 'cita' | 'cotizacion';
 export type PaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'liga';
 export type OrderMode = 'para_llevar' | 'domicilio' | 'en_local';
 
+export type Specialty = {
+  name: string;
+  /** Palabras con las que un cliente describe su problema ("despido", "fuga", "divorcio") */
+  keywords: string[];
+};
+
 export type Category = {
   slug: string;
   name: string;
+  /** Cómo se llama a quien la ejerce, ej. "Abogado", "Plomero" */
+  professional: string;
+  group: 'profesionales' | 'oficios';
   color: string;
   ink: string;
   icon: IconName;
+  specialties: Specialty[];
+};
+
+export type Post = {
+  id: string;
+  businessSlug: string;
+  kind: 'servicio' | 'consejo' | 'evento';
+  title: string;
+  body: string;
+  /** Especialidad a la que se refiere, para filtrar el muro */
+  specialty?: string;
+  price?: number;
+  priceNote?: string;
+  dateLabel: string;
+  likes: number;
+  comments: { author: string; body: string }[];
+};
+
+export type IncomingRequest = {
+  id: string;
+  type: 'cita' | 'cotizacion';
+  customer: string;
+  specialty: string;
+  detail: string;
+  when: string;
+  attend: Attend;
+  status: 'nueva' | 'aceptada' | 'cotizada' | 'rechazada';
+  quotedPrice?: number;
 };
 
 export type CatalogItem = {
@@ -64,6 +103,18 @@ export type Business = {
   isOpen: boolean;
   closesAt: string;
   phone: string;
+  /** Profesión o oficio tal como se muestra, ej. "Abogada", "Electricista" */
+  profession: string;
+  specialties: string[];
+  yearsExp: number;
+  /** Cédula profesional o certificación (oficios: certificación o registro) */
+  license?: string;
+  education?: string;
+  languages: string[];
+  attends: Attend[];
+  /** Precio de la primera consulta o visita; 0 = sin costo */
+  consultPrice?: number;
+  responseTime?: string;
   modules: Module[];
   delivers: boolean;
   verified: boolean;
