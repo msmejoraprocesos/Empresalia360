@@ -1,0 +1,11 @@
+# Configuración mínima de Supabase CLI para Expertalia 360.
+# Las migraciones en supabase/migrations se aplican al proyecto remoto
+# mediante la integración de GitHub de Supabase (o `supabase db push`).
+project_id = "expertalia-360"
+
+[db]
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]

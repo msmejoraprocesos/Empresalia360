@@ -1,0 +1,91 @@
+# Compila la app, la instala en un Android de prueba (emulador), la abre y guarda
+# el registro de errores y una captura en la rama "diagnostico" del repositorio.
+# Sirve para encontrar por qué la app se cierra sin tener que conectar un teléfono.
+
+name: Diagnóstico Android
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/diagnostico-android.yml'
+      - '.github/scripts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: diagnostico-android
+  cancel-in-progress: true
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Preparar carpeta de resultados
+        run: mkdir -p diag && echo "${{ github.sha }}" > diag/commit.txt
+
+      - name: Instalar dependencias
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Generar proyecto Android
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install --clean 2>&1 | tee ../../diag/prebuild.txt
+
+      - name: Compilar APK para el emulador (x86_64)
+        working-directory: apps/mobile/android
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64 2>&1 | tee ../../../diag/build.txt | tail -40
+
+      - name: Liberar espacio en disco para el emulador
+        run: |
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/app-release.apk"
+          rm -rf apps/mobile/android/app/build/intermediates apps/mobile/android/build apps/mobile/node_modules
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL /usr/local/lib/android/sdk/ndk "$AGENT_TOOLSDIRECTORY/CodeQL" || true
+          df -h / | tee diag/disco.txt
+
+      - name: Activar aceleración del emulador
+        run: |
+          echo "inicio emulador $(date)" >> diag/pasos.txt
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Instalar y abrir en el emulador
+        continue-on-error: true
+        timeout-minutes: 25
+        run: bash .github/scripts/emulador.sh
+
+      - name: Guardar resultados en la rama diagnostico
+        if: always()
+        run: |
+          cp -r diag /tmp/diag
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan diagnostico-tmp
+          git rm -rf . -q
+          git clean -fdxq
+          cp -r /tmp/diag/. .
+          git add -A
+          git commit -q -m "Diagnóstico de ${{ github.sha }}"
+          git push -f origin HEAD:diagnostico
