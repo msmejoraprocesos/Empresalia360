@@ -83,8 +83,8 @@ export default function ProfesionalInicio() {
             : st === 'por_vencer'
               ? `Tu plan ${planById(bill.plan).name} vence ${left === 0 ? 'hoy' : `en ${left} días`}. Toca para pagar.`
               : st === 'vencido'
-                ? `Tu plan venció. Tienes ${DIAS_GRACIA + left} días antes de bajar a Básico. Toca para pagar.`
-                : 'Bajaste a Básico por falta de pago. Toca para regresar a tu plan.';
+                ? `Tu plan venció. Tienes ${DIAS_GRACIA + left} días antes de bajar a Estándar. Toca para pagar.`
+                : 'Bajaste a Estándar por falta de pago. Toca para regresar a tu plan.';
           return (
             <Pressable
               accessibilityRole="button"

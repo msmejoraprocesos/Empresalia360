@@ -96,7 +96,7 @@ create table public.businesses (
   is_open boolean not null default true,
   accepts_orders boolean not null default true,
   delivers boolean not null default false,
-  plan text not null default 'basico',
+  plan text not null default 'estandar',
   status public.business_status not null default 'pendiente',
   rating_avg numeric(2, 1) not null default 0,
   rating_count int not null default 0,

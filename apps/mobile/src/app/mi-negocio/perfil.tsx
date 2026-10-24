@@ -104,7 +104,7 @@ function Editor() {
   const extra = specialties.filter((s) => !selectedCats.some((c) => c.specialties.some((x) => x.name === s)));
   // Cuántas categorías permite su plan (la principal cuenta)
   const bill = state.billing[myBusiness.slug];
-  const myPlan = bill ? activePlan(bill) : 'basico';
+  const myPlan = bill ? activePlan(bill) : 'estandar';
   const maxExtra = CATEGORY_LIMIT[myPlan] - 1;
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const touch = () => setSaved(false);
@@ -182,7 +182,7 @@ function Editor() {
           <Text style={styles.hint}>
             {maxExtra > 0
               ? `Tu plan ${PLANS.find((p) => p.id === myPlan)?.name} te deja estar en ${maxExtra + 1} categorías. Llevas ${extraCats.length + 1}.`
-              : 'Con el plan Básico apareces en 1 categoría. Con Plata, en 3; con Oro, en 6.'}
+              : 'Con el plan Estándar apareces en 1 categoría. Con Premium, en 3; con VIP, en 6.'}
           </Text>
           <View style={styles.wrap}>
             {CATEGORIES.filter((c) => c.slug !== categorySlug).map((c) => {

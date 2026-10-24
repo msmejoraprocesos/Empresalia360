@@ -112,8 +112,8 @@ function toBusiness(r: Row): Business {
     slug: r.slug,
     name: r.name,
     categorySlug: r.categories?.slug ?? 'abogados',
-    // Con plan Básico (o suspendido) solo cuenta la categoría principal
-    categorySlugs: r.plan && r.plan !== 'basico' ? (r.extra_categories ?? []) : [],
+    // Con plan Estándar (o suspendido) solo cuenta la categoría principal
+    categorySlugs: r.plan && r.plan !== 'estandar' ? (r.extra_categories ?? []) : [],
     subtitle: r.subtitle ?? '',
     description: r.description ?? '',
     address: r.address ?? '',
@@ -565,7 +565,7 @@ export async function saveBusiness(current: Business, patch: Partial<Business>, 
   let slug = current.slug;
   const owned = isUuid(current.id) && (await supabase.rpc('my_business_slug')).data === current.slug;
   if (!owned) {
-    slug = `${slugify(next.name) || 'experto'}-${Math.random().toString(36).slice(2, 6)}`;
+    slug = `${slugify(next.name) || 'vip'}-${Math.random().toString(36).slice(2, 6)}`;
     const { data, error } = await supabase
       .from('businesses')
       .insert({ ...fields, owner_id: uid, slug, status: 'activo', location: `SRID=4326;POINT(${ZONE.lng + (Math.random() - 0.5) * 0.01} ${ZONE.lat + (Math.random() - 0.5) * 0.01})` })

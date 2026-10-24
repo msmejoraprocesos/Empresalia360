@@ -41,7 +41,7 @@ export default function Mas() {
             title="Mi plan y mensualidad"
             subtitle={(() => {
               const bill = state.billing[myBusiness.slug];
-              return bill ? `${planById(bill.plan).name} · ${STATUS_UI[billingStatus(bill)].label}` : 'Básico · gratis';
+              return bill ? `${planById(bill.plan).name} · ${STATUS_UI[billingStatus(bill)].label}` : 'Estándar · gratis';
             })()}
             onPress={() => router.push('/mi-negocio/plan')}
           />

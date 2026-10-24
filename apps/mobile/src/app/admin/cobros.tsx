@@ -44,7 +44,7 @@ function inTab(tab: Tab, b: Billing, st: BillingStatus) {
 
 /**
  * Mensualidades: quién pagó, quién debe y quién avisó que ya pagó.
- * Las reglas corren solas en la base todos los días (aviso, gracia y baja a Básico).
+ * Las reglas corren solas en la base todos los días (aviso, gracia y baja a Estándar).
  */
 export default function AdminMensualidades() {
   const { state, actions } = useApp();
@@ -52,7 +52,7 @@ export default function AdminMensualidades() {
   const [registering, setRegistering] = useState<string | null>(null);
 
   const rows = BUSINESSES.map((b) => {
-    const bill = state.billing[b.slug] ?? { plan: 'basico' as PlanId, payments: [] };
+    const bill = state.billing[b.slug] ?? { plan: 'estandar' as PlanId, payments: [] };
     return { b, bill, st: billingStatus(bill) };
   });
   const count = (t: Tab) => rows.filter((r) => inTab(t, r.bill, r.st)).length;
@@ -109,7 +109,7 @@ export default function AdminMensualidades() {
                 <Text style={styles.sub}>
                   {plan.name}
                   {plan.price ? ` · ${money(plan.price)}/mes` : ''}
-                  {activePlan(bill) !== bill.plan ? ' · hoy se muestra como Básico' : ''}
+                  {activePlan(bill) !== bill.plan ? ' · hoy se muestra como Estándar' : ''}
                 </Text>
                 {bill.paidUntil ? (
                   <Text style={styles.sub}>
@@ -162,7 +162,7 @@ export default function AdminMensualidades() {
                       openWhatsApp(
                         st === 'por_vencer'
                           ? `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 vence el ${niceDate(bill.paidUntil)}. Para seguir apareciendo destacado, paga ${money(plan.price)} desde la app en Más → Mi plan. ¡Gracias!`
-                          : `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 venció el ${niceDate(bill.paidUntil)}. ${st === 'suspendido' ? 'Tu perfil sigue visible, pero ya está como Básico.' : `Tienes hasta ${DIAS_GRACIA} días de gracia antes de bajar a Básico.`} Puedes pagar desde la app en Más → Mi plan.`,
+                          : `Hola, ${b.name}. Tu plan ${plan.name} de Expertalia 360 venció el ${niceDate(bill.paidUntil)}. ${st === 'suspendido' ? 'Tu perfil sigue visible, pero ya está como Estándar.' : `Tienes hasta ${DIAS_GRACIA} días de gracia antes de bajar a Estándar.`} Puedes pagar desde la app en Más → Mi plan.`,
                         b.phone,
                       )
                     }
@@ -179,7 +179,7 @@ export default function AdminMensualidades() {
         <Text style={[styles.name, { color: '#E3B04B' }]}>Lo que pasa solo, todos los días a las 6:00</Text>
         <Text style={styles.rule}>• Faltan {DIAS_AVISO} días o menos: queda “Por vencer” y al negocio le sale un aviso en su panel para pagar.</Text>
         <Text style={styles.rule}>• Se le pasó la fecha: queda “Vencido” con {DIAS_GRACIA} días de gracia; sigue con su plan y el aviso se vuelve rojo.</Text>
-        <Text style={styles.rule}>• Pasan los {DIAS_GRACIA} días: baja a Básico (gratis). Sigue visible en el directorio, pero pierde lo de su plan.</Text>
+        <Text style={styles.rule}>• Pasan los {DIAS_GRACIA} días: baja a Estándar (gratis). Sigue visible en el directorio, pero pierde lo de su plan.</Text>
         <Text style={styles.rule}>• Avisa que pagó: te aparece en “Por confirmar” con su comprobante. Al confirmar, la fecha se recorre sola y regresa a su plan.</Text>
       </AdminCard>
 

@@ -100,7 +100,7 @@ export default function AdminPublicidad() {
             </Text>
           </View>
         ))}
-        <Text style={styles.sub}>Descuento de 10% para planes Plata y Oro. Tarifas de ejemplo: cámbialas aquí con tus precios.</Text>
+        <Text style={styles.sub}>Descuento de 10% para planes Premium y VIP. Tarifas de ejemplo: cámbialas aquí con tus precios.</Text>
       </AdminCard>
     </AdminShell>
   );

@@ -103,7 +103,7 @@ Como administrador puedes:
    - Todos los días la base revisa a todos los negocios:
      - A 5 días de vencer, el negocio ve un aviso para pagar.
      - Ya vencido, tiene 7 días de gracia.
-     - Pasados los 7 días, baja a Básico (sigue visible, pero sin los beneficios de su plan).
+     - Pasados los 7 días, baja a Estándar (sigue visible, pero sin los beneficios de su plan).
 
 ## Qué cambia en la app al conectarla
 

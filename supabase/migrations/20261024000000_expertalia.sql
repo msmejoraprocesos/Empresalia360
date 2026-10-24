@@ -91,7 +91,7 @@ begin
   end if;
   if tg_op = 'INSERT' then
     new.verified := false;
-    new.plan := 'basico';
+    new.plan := 'estandar';
     new.rating_avg := 0;
     new.rating_count := 0;
     return new;

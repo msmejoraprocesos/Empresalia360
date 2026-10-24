@@ -617,7 +617,7 @@ function useAppState() {
         const pay: SubPayment = { ...p, id: uid(), status: 'pendiente', createdAt: Date.now() };
         if (online) void remote.reportSubPayment(slug, pay).then(() => refreshBilling());
         update((s) => {
-          const b = s.billing[slug] ?? { plan: 'basico' as PlanId, payments: [] };
+          const b = s.billing[slug] ?? { plan: 'estandar' as PlanId, payments: [] };
           return { ...s, billing: { ...s.billing, [slug]: { ...b, payments: [pay, ...b.payments] } } };
         });
       },

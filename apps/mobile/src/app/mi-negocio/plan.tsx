@@ -21,10 +21,10 @@ const METHODS: { id: SubPayment['method']; label: string }[] = [
 /** Mi plan: en qué plan estoy, hasta cuándo está pagado, cómo pagar y avisar que ya pagué. */
 export default function MiPlan() {
   const { state, actions } = useApp();
-  const bill = state.billing[myBusiness.slug] ?? { plan: 'basico' as PlanId, payments: [] };
+  const bill = state.billing[myBusiness.slug] ?? { plan: 'estandar' as PlanId, payments: [] };
   const st = billingStatus(bill);
   const left = daysLeft(bill.paidUntil);
-  const [plan, setPlan] = useState<PlanId>(bill.plan === 'basico' ? 'plata' : bill.plan);
+  const [plan, setPlan] = useState<PlanId>(bill.plan === 'estandar' ? 'premium' : bill.plan);
   const [months, setMonths] = useState(1);
   const [method, setMethod] = useState<SubPayment['method']>('transferencia');
   const [reference, setReference] = useState('');
@@ -46,8 +46,8 @@ export default function MiPlan() {
             ? 'Tu plan vence hoy. Paga para no perder tus beneficios.'
             : `Tu plan vence en ${left} días (${niceDate(bill.paidUntil)}). Paga para no perder tus beneficios.`
           : st === 'vencido'
-            ? `Tu plan venció hace ${-left} días. Tienes ${DIAS_GRACIA + left} días de gracia antes de bajar a Básico.`
-            : 'Tu plan se venció y bajaste a Básico. Sigues visible, pero sin los beneficios. Paga para regresar.';
+            ? `Tu plan venció hace ${-left} días. Tienes ${DIAS_GRACIA + left} días de gracia antes de bajar a Estándar.`
+            : 'Tu plan se venció y bajaste a Estándar. Sigues visible, pero sin los beneficios. Paga para regresar.';
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>

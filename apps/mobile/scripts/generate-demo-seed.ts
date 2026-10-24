@@ -82,7 +82,7 @@ for (const b of BUSINESSES) {
     `  (select id from public.zones where slug = ${q(slugify(b.zone))}),`,
     `  ${q(b.phone)}, ${q(b.phone)}, ${q(b.address)},`,
     `  extensions.st_setsrid(extensions.st_makepoint(${b.lng}, ${b.lat}), 4326)::extensions.geography,`,
-    `  ${b.isOpen}, true, ${b.delivers}, 'plata', 'activo', ${b.verified}, ${q(b.promo)},`,
+    `  ${b.isOpen}, true, ${b.delivers}, 'premium', 'activo', ${b.verified}, ${q(b.promo)},`,
     `  ${q(b.profession)}, ${arr(b.specialties)}, ${arr(b.categorySlugs)}, ${b.yearsExp}, ${q(b.license)}, ${q(b.education)}, ${arr(b.languages)}, ${arr(b.attends)}, ${q(b.consultPrice)}, ${q(b.responseTime)}, ${q(b.references)}, ${Boolean(b.urgent24)}, ${q(b.warranty)}, ${q(b.paymentInfo)}, ${q(b.photo?.startsWith('http') ? b.photo : undefined)}, ${q(b.cover?.startsWith('http') ? b.cover : undefined)}`,
     `where not exists (select 1 from public.businesses where slug = ${q(b.slug)});`,
     '',
@@ -125,7 +125,7 @@ for (const b of BUSINESSES) {
   const off = bill.paidUntil ? Math.round((new Date(`${bill.paidUntil}T00:00:00`).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000) : null;
   out.push(
     off === null
-      ? `update public.businesses set plan = 'basico', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = ${q(b.slug)};`
+      ? `update public.businesses set plan = 'estandar', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = ${q(b.slug)};`
       : `update public.businesses set plan = ${q(bill.plan)}, paid_plan = ${q(bill.plan)}, paid_until = current_date + ${off}, plan_status = public.billing_status(${q(bill.plan)}, current_date + ${off}) where slug = ${q(b.slug)};`,
   );
   for (const p of bill.payments) {

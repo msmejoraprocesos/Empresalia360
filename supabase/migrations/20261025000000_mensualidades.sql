@@ -1,11 +1,11 @@
 -- Expertalia 360 · mensualidades de los negocios
--- Cada negocio tiene un plan (basico = gratis, plata, oro) y una fecha "pagado hasta".
+-- Cada negocio tiene un plan (estandar = gratis, premium, vip) y una fecha "pagado hasta".
 -- 1. El negocio avisa que pagó (transferencia, depósito o efectivo) y sube su comprobante.
 -- 2. El administrador lo confirma y la fecha se recorre solita 1, 3 o 12 meses.
 -- 3. Todos los días, a las 6:00, la base revisa a todos:
 --      faltan 5 días o menos  → por_vencer   (la app le avisa al negocio)
 --      ya venció              → vencido      (7 días de gracia; sigue con su plan)
---      venció hace más de 7   → suspendido   (baja a Básico: sigue visible, pierde lo de paga)
+--      venció hace más de 7   → suspendido   (baja a Estándar: sigue visible, pierde lo de paga)
 --    Al volver a pagar, regresa a su plan.
 
 create table if not exists public.plans (
@@ -17,9 +17,9 @@ create table if not exists public.plans (
 );
 
 insert into public.plans (id, name, monthly_price, features, position) values
-  ('basico', 'Básico', 0, array['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'], 1),
-  ('plata', 'Plata', 399, array['Todo lo de Básico', 'Servicios y paquetes ilimitados', 'Sales antes en las búsquedas', 'Muro y 3 promociones al mes', 'Estadísticas de tu perfil'], 2),
-  ('oro', 'Oro', 799, array['Todo lo de Plata', 'Destacado en tu especialidad', 'Campañas a tus clientes', 'Varios colaboradores', '10% de descuento en espacios'], 3)
+  ('estandar', 'Estándar', 0, array['Perfil con fotos y especialidades', 'Pin en el mapa', 'Reseñas y agenda', 'Hasta 5 servicios'], 1),
+  ('premium', 'Premium', 399, array['Todo lo de Estándar', 'Servicios y paquetes ilimitados', 'Sales antes en las búsquedas', 'Muro y 3 promociones al mes', 'Estadísticas de tu perfil'], 2),
+  ('vip', 'VIP', 799, array['Todo lo de Premium', 'Primero en tu especialidad', 'Campañas a tus clientes', 'Varios colaboradores', '10% de descuento en espacios'], 3)
 on conflict (id) do update set name = excluded.name, monthly_price = excluded.monthly_price, features = excluded.features, position = excluded.position;
 
 alter table public.businesses
@@ -55,7 +55,7 @@ returns text
 language sql immutable
 as $$
   select case
-    when p_plan = 'basico' and p_paid_until is null then 'gratis'
+    when p_plan = 'estandar' and p_paid_until is null then 'gratis'
     when p_paid_until is null then 'vencido'
     when p_paid_until - current_date > 5 then 'al_corriente'
     when p_paid_until >= current_date then 'por_vencer'
@@ -64,7 +64,7 @@ as $$
   end;
 $$;
 
--- Revisión diaria: actualiza estados y baja a Básico a quien lleva más de 7 días vencido
+-- Revisión diaria: actualiza estados y baja a Estándar a quien lleva más de 7 días vencido
 create or replace function public.refresh_billing()
 returns int
 language plpgsql security definer set search_path = ''
@@ -74,8 +74,8 @@ declare
 begin
   update public.businesses b
   set plan_status = public.billing_status(coalesce(b.paid_plan, b.plan), b.paid_until),
-      plan = case when public.billing_status(coalesce(b.paid_plan, b.plan), b.paid_until) = 'suspendido' then 'basico' else b.plan end
-  where b.paid_until is not null or b.plan <> 'basico';
+      plan = case when public.billing_status(coalesce(b.paid_plan, b.plan), b.paid_until) = 'suspendido' then 'estandar' else b.plan end
+  where b.paid_until is not null or b.plan <> 'estandar';
   get diagnostics n = row_count;
   return n;
 end;
@@ -121,7 +121,7 @@ begin
   end if;
   if tg_op = 'INSERT' then
     new.verified := false;
-    new.plan := 'basico';
+    new.plan := 'estandar';
     new.rating_avg := 0;
     new.rating_count := 0;
     new.paid_until := null;
@@ -142,9 +142,9 @@ begin
 end;
 $$;
 
--- Cuántas categorías puede tener cada negocio según su plan (la principal cuenta): Básico 1, Plata 3, Oro 6.
+-- Cuántas categorías puede tener cada negocio según su plan (la principal cuenta): Estándar 1, Premium 3, VIP 6.
 alter table public.plans add column if not exists max_categories int not null default 1;
-update public.plans set max_categories = case id when 'basico' then 1 when 'plata' then 3 when 'oro' then 6 else 1 end;
+update public.plans set max_categories = case id when 'estandar' then 1 when 'premium' then 3 when 'vip' then 6 else 1 end;
 
 create or replace function public.businesses_limit_categories()
 returns trigger
@@ -176,13 +176,13 @@ create trigger businesses_categories_limit
   before insert or update of extra_categories, plan, category_id on public.businesses
   for each row execute function public.businesses_limit_categories();
 
--- Al bajar a Básico por falta de pago, conserva sus categorías extra guardadas pero solo cuenta la principal
+-- Al bajar a Estándar por falta de pago, conserva sus categorías extra guardadas pero solo cuenta la principal
 create or replace function public.business_categories(b public.businesses)
 returns text[]
 language sql stable set search_path = ''
 as $$
   select array[(select slug from public.categories where id = b.category_id)]
-    || case when b.plan = 'basico' then '{}'::text[] else b.extra_categories[1:(select max_categories - 1 from public.plans where id = b.plan)] end;
+    || case when b.plan = 'estandar' then '{}'::text[] else b.extra_categories[1:(select max_categories - 1 from public.plans where id = b.plan)] end;
 $$;
 
 -- Comprobantes: bucket privado; el dueño sube a la carpeta de su negocio, solo él y el admin los ven
@@ -227,7 +227,7 @@ grant execute on function public.billing_status(text, date) to anon, authenticat
 
 -- Los negocios que ya tenían plan de paga arrancan con un mes pagado
 update public.businesses set paid_until = current_date + 30, paid_plan = plan, plan_status = 'al_corriente'
-where plan <> 'basico' and paid_until is null;
+where plan <> 'estandar' and paid_until is null;
 
 -- Revisión automática diaria (6:00 hora del centro de México = 12:00 UTC).
 -- Requiere la extensión pg_cron (Supabase → Database → Extensions → pg_cron). Si no está, se omite.

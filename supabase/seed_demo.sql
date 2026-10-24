@@ -10,7 +10,7 @@ select 'Lic. Mariana Ortiz', 'lic-mariana-ortiz', 'Abogada · familiar y civil',
   (select id from public.zones where slug = 'queretaro-centro'),
   '5214420000101', '5214420000101', 'Plaza Zen, local 8',
   extensions.st_setsrid(extensions.st_makepoint(-100.3254, 20.6012), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, 'Primera consulta en línea a $350',
+  true, true, false, 'premium', 'activo', true, 'Primera consulta en línea a $350',
   'Abogada', array['Familiar', 'Civil e inmobiliario']::text[], '{}'::text[], 12, 'Cédula 7845120', 'Licenciatura en Derecho, UAQ · Maestría en Derecho Familiar', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 500, 'Responde en menos de 2 h', 'Plaza Zen, planta alta, local 8. Frente al Oxxo; hay estacionamiento de la plaza.', false, null, 'BBVA · CLABE 012 680 0123 4567 8901 · a nombre de Mariana Ortiz Lara', null, null
 where not exists (select 1 from public.businesses where slug = 'lic-mariana-ortiz');
 
@@ -37,8 +37,8 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'Pedro S.', 5, 'Muy humana en un momento difícil. Siempre contestó mis dudas.', null, now() - interval '2 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and author_name = 'Pedro S.' and body = 'Muy humana en un momento difícil. Siempre contestó mis dudas.');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'Usuario verificado', 4, 'Buena abogada, los tiempos del juzgado se alargaron pero ella me mantuvo informado.', null, now() - interval '3 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and author_name = 'Usuario verificado' and body = 'Buena abogada, los tiempos del juzgado se alargaron pero ella me mantuvo informado.');
 update public.businesses set rating_avg = 5.0, rating_count = 41, verified = true where slug = 'lic-mariana-ortiz';
-update public.businesses set plan = 'oro', paid_plan = 'oro', paid_until = current_date + 24, plan_status = public.billing_status('oro', current_date + 24) where slug = 'lic-mariana-ortiz';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'oro', 1, 799, 'deposito', 'SPEI 7300', 'pagado', current_date + 24, now() - interval '177 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and reference = 'SPEI 7300');
+update public.businesses set plan = 'vip', paid_plan = 'vip', paid_until = current_date + 24, plan_status = public.billing_status('vip', current_date + 24) where slug = 'lic-mariana-ortiz';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'lic-mariana-ortiz'), 'vip', 1, 799, 'deposito', 'SPEI 7300', 'pagado', current_date + 24, now() - interval '178 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'lic-mariana-ortiz') and reference = 'SPEI 7300');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -47,7 +47,7 @@ select 'Ortiz Salinas Abogados', 'ortiz-salinas-abogados', 'Despacho · empresas
   (select id from public.zones where slug = 'centro-sur'),
   '5214420000102', '5214420000102', 'Blvd. Bernardo Quintana 450, piso 7',
   extensions.st_setsrid(extensions.st_makepoint(-100.3265, 20.6041), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null,
+  true, true, false, 'premium', 'activo', true, null,
   'Despacho de abogados', array['Mercantil y corporativo', 'Fiscal', 'Laboral', 'Contabilidad de empresas']::text[], array['contadores']::text[], 18, '6 abogados con cédula verificada', 'Socios egresados de la Escuela Libre de Derecho y el ITAM', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 1200, 'Responde el mismo día', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'ortiz-salinas-abogados');
 
@@ -68,8 +68,8 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'cotizacion', 'Defensa de crédito fiscal', null, 'Fiscal', null, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and name = 'Defensa de crédito fiscal');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'Luis T.', 5, 'Constituimos la empresa en tiempo récord y sin sorpresas en el costo.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and author_name = 'Luis T.' and body = 'Constituimos la empresa en tiempo récord y sin sorpresas en el costo.');
 update public.businesses set rating_avg = 4.8, rating_count = 67, verified = true where slug = 'ortiz-salinas-abogados';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + 3, plan_status = public.billing_status('plata', current_date + 3) where slug = 'ortiz-salinas-abogados';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'plata', 1, 399, 'transferencia', 'SPEI 7337', 'pagado', current_date + 3, now() - interval '681 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and reference = 'SPEI 7337');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + 3, plan_status = public.billing_status('premium', current_date + 3) where slug = 'ortiz-salinas-abogados';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'premium', 1, 399, 'transferencia', 'SPEI 7337', 'pagado', current_date + 3, now() - interval '682 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'ortiz-salinas-abogados') and reference = 'SPEI 7337');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -78,7 +78,7 @@ select 'Lic. Roberto Campos', 'lic-roberto-campos', 'Abogado · laboral', 'Despi
   (select id from public.zones where slug = 'centro-historico'),
   '5214420000103', '5214420000103', 'Calle Madero 33, despacho 2',
   extensions.st_setsrid(extensions.st_makepoint(-100.3318, 20.6008), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null,
+  true, true, false, 'premium', 'activo', true, null,
   'Abogado', array['Laboral']::text[], '{}'::text[], 9, 'Cédula 9120334', 'Licenciatura en Derecho, UNAM', array['Español']::text[], array['despacho', 'en_linea']::text[], 0, 'Responde en menos de 1 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'lic-roberto-campos');
 
@@ -96,9 +96,9 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'cotizacion', 'Demanda por despido', 'Honorarios sobre lo recuperado', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and name = 'Demanda por despido');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'Jorge V.', 5, 'Recuperé mi finiquito completo. Siempre me tuvo al tanto.', null, now() - interval '3 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and author_name = 'Jorge V.' and body = 'Recuperé mi finiquito completo. Siempre me tuvo al tanto.');
 update public.businesses set rating_avg = 4.7, rating_count = 58, verified = true where slug = 'lic-roberto-campos';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + -4, plan_status = public.billing_status('plata', current_date + -4) where slug = 'lic-roberto-campos';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'plata', 3, 1197, 'transferencia', 'SPEI 9102', 'pendiente', null, now() - interval '4 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and reference = 'SPEI 9102');
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'plata', 1, 399, 'deposito', 'SPEI 7374', 'pagado', current_date + -4, now() - interval '849 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and reference = 'SPEI 7374');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + -4, plan_status = public.billing_status('premium', current_date + -4) where slug = 'lic-roberto-campos';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'premium', 3, 1197, 'transferencia', 'SPEI 9102', 'pendiente', null, now() - interval '4 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and reference = 'SPEI 9102');
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'lic-roberto-campos'), 'premium', 1, 399, 'deposito', 'SPEI 7374', 'pagado', current_date + -4, now() - interval '850 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'lic-roberto-campos') and reference = 'SPEI 7374');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -107,7 +107,7 @@ select 'Lic. Daniela Treviño', 'lic-daniela-trevino', 'Abogada · migratorio y 
   (select id from public.zones where slug = 'juriquilla'),
   '5214420000104', '5214420000104', 'Atención en línea',
   extensions.st_setsrid(extensions.st_makepoint(-100.3335, 20.5985), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null,
+  true, true, false, 'premium', 'activo', true, null,
   'Abogada', array['Migratorio', 'Penal']::text[], '{}'::text[], 7, 'Cédula 10233871', 'Licenciatura en Derecho, Tec de Monterrey', array['Español', 'Inglés', 'Francés']::text[], array['en_linea', 'despacho']::text[], 600, 'Responde en menos de 3 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'lic-daniela-trevino');
 
@@ -126,7 +126,7 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'lic-daniela-trevino'), 'cotizacion', 'Defensa penal', null, null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'lic-daniela-trevino') and name = 'Defensa penal');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'lic-daniela-trevino'), 'Michael B.', 5, 'Got my permanent residency without a single trip back to the office. Excelente.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'lic-daniela-trevino') and author_name = 'Michael B.' and body = 'Got my permanent residency without a single trip back to the office. Excelente.');
 update public.businesses set rating_avg = 4.9, rating_count = 33, verified = true where slug = 'lic-daniela-trevino';
-update public.businesses set plan = 'basico', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'lic-daniela-trevino';
+update public.businesses set plan = 'estandar', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'lic-daniela-trevino';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -135,7 +135,7 @@ select 'Despacho Contable Reyes', 'despacho-contable-reyes', 'Contadores · pers
   (select id from public.zones where slug = 'queretaro-centro'),
   '5214420000105', '5214420000105', 'Av. Zaragoza 120, piso 3',
   extensions.st_setsrid(extensions.st_makepoint(-100.3301, 20.6022), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null,
+  true, true, false, 'premium', 'activo', true, null,
   'Contadores públicos', array['Declaración anual', 'Contabilidad de empresas', 'Defensa ante el SAT', 'Nómina e IMSS', 'Finanzas para PyME']::text[], array['consultoria']::text[], 15, 'C.P.C. Héctor Reyes · Cédula 4410982', 'Contaduría Pública, UAQ · Certificación IMCP', array['Español']::text[], array['despacho', 'en_linea']::text[], 0, 'Responde el mismo día', 'Edificio gris de 4 pisos, piso 3. Entrada por Zaragoza, a media cuadra del jardín.', false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'despacho-contable-reyes');
 
@@ -163,8 +163,8 @@ insert into public.loyalty_programs (business_id, kind, goal, percent, reward) s
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'Rodrigo M.', 5, 'Me sacaron de un requerimiento del SAT en una semana. Muy claros con los costos.', null, now() - interval '2 days' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and author_name = 'Rodrigo M.' and body = 'Me sacaron de un requerimiento del SAT en una semana. Muy claros con los costos.');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'Lucía P.', 5, 'Mi declaración anual quedó en un día y con saldo a favor.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and author_name = 'Lucía P.' and body = 'Mi declaración anual quedó en un día y con saldo a favor.');
 update public.businesses set rating_avg = 4.9, rating_count = 132, verified = true where slug = 'despacho-contable-reyes';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + 17, plan_status = public.billing_status('plata', current_date + 17) where slug = 'despacho-contable-reyes';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'plata', 1, 399, 'deposito', 'SPEI 7448', 'pagado', current_date + 17, now() - interval '345 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and reference = 'SPEI 7448');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + 17, plan_status = public.billing_status('premium', current_date + 17) where slug = 'despacho-contable-reyes';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'premium', 1, 399, 'deposito', 'SPEI 7448', 'pagado', current_date + 17, now() - interval '346 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'despacho-contable-reyes') and reference = 'SPEI 7448');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -173,7 +173,7 @@ select 'C.P. Laura Méndez', 'cp-laura-mendez', 'Contadora · freelancers y RESI
   (select id from public.zones where slug = 'juriquilla'),
   '5214420000106', '5214420000106', 'Atención en línea',
   extensions.st_setsrid(extensions.st_makepoint(-100.3302, 20.5979), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null,
+  true, true, false, 'premium', 'activo', true, null,
   'Contadora', array['RESICO y personas físicas', 'Declaración anual', 'Facturación']::text[], '{}'::text[], 6, 'Cédula 11092376', 'Contaduría, UVM', array['Español']::text[], array['en_linea']::text[], 350, 'Responde en menos de 1 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'cp-laura-mendez');
 
@@ -193,8 +193,8 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'producto', 'Declaración anual', 'Persona física', 'Paquetes', 950, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and name = 'Declaración anual');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'Claudia R.', 5, 'Por fin entiendo mis impuestos. Responde rapidísimo.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and author_name = 'Claudia R.' and body = 'Por fin entiendo mis impuestos. Responde rapidísimo.');
 update public.businesses set rating_avg = 4.8, rating_count = 94, verified = true where slug = 'cp-laura-mendez';
-update public.businesses set plan = 'oro', paid_plan = 'oro', paid_until = current_date + 9, plan_status = public.billing_status('oro', current_date + 9) where slug = 'cp-laura-mendez';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'oro', 1, 799, 'transferencia', 'SPEI 7485', 'pagado', current_date + 9, now() - interval '537 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and reference = 'SPEI 7485');
+update public.businesses set plan = 'vip', paid_plan = 'vip', paid_until = current_date + 9, plan_status = public.billing_status('vip', current_date + 9) where slug = 'cp-laura-mendez';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'cp-laura-mendez'), 'vip', 1, 799, 'transferencia', 'SPEI 7485', 'pagado', current_date + 9, now() - interval '538 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'cp-laura-mendez') and reference = 'SPEI 7485');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -203,7 +203,7 @@ select 'Notaría Pública 14', 'notaria-publica-14', 'Notaría · escrituras y t
   (select id from public.zones where slug = 'centro-sur'),
   '5214420000107', '5214420000107', 'Av. Universidad 280',
   extensions.st_setsrid(extensions.st_makepoint(-100.3342, 20.6031), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null,
+  true, true, false, 'premium', 'activo', true, null,
   'Notaría', array['Escrituras', 'Testamentos', 'Poderes notariales']::text[], '{}'::text[], 25, 'Lic. Andrade · Notario titular', null, array['Español']::text[], array['despacho']::text[], 0, 'Cotiza en 24 h', 'Casona amarilla frente a la Facultad de Derecho. Estacionamiento en la parte trasera.', false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'notaria-publica-14');
 
@@ -221,8 +221,8 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'notaria-publica-14'), 'cotizacion', 'Testamento', null, null, null, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and name = 'Testamento');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'notaria-publica-14'), 'Marta L.', 5, 'Todo listo en la fecha prometida. Excelente trato.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and author_name = 'Marta L.' and body = 'Todo listo en la fecha prometida. Excelente trato.');
 update public.businesses set rating_avg = 4.6, rating_count = 112, verified = true where slug = 'notaria-publica-14';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + -12, plan_status = public.billing_status('plata', current_date + -12) where slug = 'notaria-publica-14';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'notaria-publica-14'), 'plata', 1, 399, 'deposito', 'SPEI 7522', 'pagado', current_date + -12, now() - interval '1041 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and reference = 'SPEI 7522');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + -12, plan_status = public.billing_status('premium', current_date + -12) where slug = 'notaria-publica-14';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'notaria-publica-14'), 'premium', 1, 399, 'deposito', 'SPEI 7522', 'pagado', current_date + -12, now() - interval '1042 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'notaria-publica-14') and reference = 'SPEI 7522');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -231,7 +231,7 @@ select 'Traducciones Peritas Morales', 'traducciones-peritas-morales', 'Perito t
   (select id from public.zones where slug = 'centro-historico'),
   '5214420000108', '5214420000108', 'Calle Hidalgo 77',
   extensions.st_setsrid(extensions.st_makepoint(-100.3312, 20.6058), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null,
+  true, true, false, 'premium', 'activo', true, null,
   'Perito traductor', array['Traducción certificada']::text[], '{}'::text[], 11, 'Perito autorizado por el Tribunal Superior de Justicia', null, array['Español', 'Inglés', 'Francés']::text[], array['despacho', 'en_linea']::text[], null, 'Entrega en 48 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'traducciones-peritas-morales');
 
@@ -248,7 +248,7 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'traducciones-peritas-morales'), 'producto', 'Título profesional', null, 'Certificadas', 650, null, true, 3 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'traducciones-peritas-morales') and name = 'Título profesional');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'traducciones-peritas-morales'), 'Lic. Mariana Ortiz', 5, 'Mi perito de confianza para juicios. Siempre a tiempo.', null, now() - interval '5 days' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'traducciones-peritas-morales') and author_name = 'Lic. Mariana Ortiz' and body = 'Mi perito de confianza para juicios. Siempre a tiempo.');
 update public.businesses set rating_avg = 4.9, rating_count = 49, verified = true where slug = 'traducciones-peritas-morales';
-update public.businesses set plan = 'basico', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'traducciones-peritas-morales';
+update public.businesses set plan = 'estandar', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'traducciones-peritas-morales';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -257,7 +257,7 @@ select 'Psic. Andrea Vidal', 'psic-andrea-vidal', 'Psicóloga · adultos y parej
   (select id from public.zones where slug = 'juriquilla'),
   '5214420000109', '5214420000109', 'Calle Jazmín 41, consultorio 2',
   extensions.st_setsrid(extensions.st_makepoint(-100.3355, 20.5995), 4326)::extensions.geography,
-  true, true, false, 'plata', 'activo', true, null,
+  true, true, false, 'premium', 'activo', true, null,
   'Psicóloga', array['Terapia individual', 'Terapia de pareja', 'Ansiedad y estrés']::text[], '{}'::text[], 10, 'Cédula 8031457', 'Maestría en Psicoterapia Cognitivo Conductual', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 700, 'Responde en menos de 4 h', 'Consultorio 2, planta baja. Timbre con el nombre "Vidal".', false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'psic-andrea-vidal');
 
@@ -275,8 +275,8 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'psic-andrea-vidal'), null, 'Consultorio', '#F8E1EB', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and caption = 'Consultorio');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'psic-andrea-vidal'), 'Usuario verificado', 5, 'Me sentí escuchado desde la primera sesión.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and author_name = 'Usuario verificado' and body = 'Me sentí escuchado desde la primera sesión.');
 update public.businesses set rating_avg = 4.9, rating_count = 87, verified = true where slug = 'psic-andrea-vidal';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + 2, plan_status = public.billing_status('plata', current_date + 2) where slug = 'psic-andrea-vidal';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'psic-andrea-vidal'), 'plata', 1, 399, 'deposito', 'SPEI 7596', 'pagado', current_date + 2, now() - interval '705 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and reference = 'SPEI 7596');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + 2, plan_status = public.billing_status('premium', current_date + 2) where slug = 'psic-andrea-vidal';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'psic-andrea-vidal'), 'premium', 1, 399, 'deposito', 'SPEI 7596', 'pagado', current_date + 2, now() - interval '706 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'psic-andrea-vidal') and reference = 'SPEI 7596');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -285,7 +285,7 @@ select 'Arq. Diego Fuentes', 'arq-diego-fuentes', 'Arquitecto · proyectos y lic
   (select id from public.zones where slug = 'el-marques'),
   '5214420000110', '5214420000110', 'Av. Industrial 102',
   extensions.st_setsrid(extensions.st_makepoint(-100.3235, 20.6015), 4326)::extensions.geography,
-  false, true, true, 'plata', 'activo', true, null,
+  false, true, true, 'premium', 'activo', true, null,
   'Arquitecto', array['Proyecto arquitectónico', 'Licencias de construcción', 'Remodelación', 'Albañilería', 'Impermeabilización']::text[], array['pintura-y-albanileria']::text[], 14, 'Cédula 5520981 · DRO registrado', 'Arquitectura, UAQ', array['Español']::text[], array['domicilio', 'despacho']::text[], 800, 'Responde en menos de 1 día', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'arq-diego-fuentes');
 
@@ -305,8 +305,8 @@ insert into public.business_photos (business_id, url, caption, color, position) 
 insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'arq-diego-fuentes'), null, 'Casa habitación, El Marqués', '#DCE4F2', 1 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and caption = 'Casa habitación, El Marqués');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'arq-diego-fuentes'), 'Jorge V.', 5, 'La licencia salió a la primera, gracias a sus planos.', null, now() - interval '3 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and author_name = 'Jorge V.' and body = 'La licencia salió a la primera, gracias a sus planos.');
 update public.businesses set rating_avg = 4.7, rating_count = 29, verified = true where slug = 'arq-diego-fuentes';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + 28, plan_status = public.billing_status('plata', current_date + 28) where slug = 'arq-diego-fuentes';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'arq-diego-fuentes'), 'plata', 1, 399, 'transferencia', 'SPEI 7633', 'pagado', current_date + 28, now() - interval '81 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and reference = 'SPEI 7633');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + 28, plan_status = public.billing_status('premium', current_date + 28) where slug = 'arq-diego-fuentes';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'arq-diego-fuentes'), 'premium', 1, 399, 'transferencia', 'SPEI 7633', 'pagado', current_date + 28, now() - interval '82 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'arq-diego-fuentes') and reference = 'SPEI 7633');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -315,7 +315,7 @@ select 'Patricia Luna', 'patricia-luna-seguros', 'Asesora de seguros · vida y g
   (select id from public.zones where slug = 'queretaro-centro'),
   '5214420000111', '5214420000111', 'Plaza Zen, local 15',
   extensions.st_setsrid(extensions.st_makepoint(-100.3281, 20.6005), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, null,
+  true, true, true, 'premium', 'activo', true, null,
   'Asesora de seguros', array['Seguros de gastos médicos', 'Seguros de vida y retiro']::text[], '{}'::text[], 8, 'Cédula CNSF A-120394', null, array['Español']::text[], array['despacho', 'en_linea', 'domicilio']::text[], 0, 'Responde en menos de 1 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'patricia-luna-seguros');
 
@@ -333,7 +333,7 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'patricia-luna-seguros'), 'cotizacion', 'Gastos médicos mayores', 'Individual o familiar', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'patricia-luna-seguros') and name = 'Gastos médicos mayores');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'patricia-luna-seguros'), 'Laura M.', 5, 'Me explicó cada cobertura sin presiones.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'patricia-luna-seguros') and author_name = 'Laura M.' and body = 'Me explicó cada cobertura sin presiones.');
 update public.businesses set rating_avg = 4.8, rating_count = 53, verified = true where slug = 'patricia-luna-seguros';
-update public.businesses set plan = 'basico', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'patricia-luna-seguros';
+update public.businesses set plan = 'estandar', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'patricia-luna-seguros';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -342,7 +342,7 @@ select 'Rumbo Consultores', 'rumbo-consultores', 'Consultoría · procesos y fin
   (select id from public.zones where slug = 'centro-sur'),
   '5214420000112', '5214420000112', 'Av. Constituyentes 812',
   extensions.st_setsrid(extensions.st_makepoint(-100.3245, 20.5992), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, null,
+  true, true, true, 'premium', 'activo', true, null,
   'Consultoría para PyMEs', array['Mejora de procesos', 'Finanzas para PyME']::text[], '{}'::text[], 12, null, 'Ingeniería Industrial · Lean Six Sigma Black Belt', array['Español', 'Inglés']::text[], array['domicilio', 'en_linea']::text[], 0, 'Responde el mismo día', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'rumbo-consultores');
 
@@ -358,9 +358,9 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'rumbo-consultores'), 'cotizacion', 'Proyecto de mejora de procesos', '4 a 8 semanas', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and name = 'Proyecto de mejora de procesos');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'rumbo-consultores'), 'Ana G.', 5, 'Bajamos 15% los costos del taller en dos meses.', null, now() - interval '1 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and author_name = 'Ana G.' and body = 'Bajamos 15% los costos del taller en dos meses.');
 update public.businesses set rating_avg = 4.9, rating_count = 38, verified = true where slug = 'rumbo-consultores';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + -2, plan_status = public.billing_status('plata', current_date + -2) where slug = 'rumbo-consultores';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'rumbo-consultores'), 'plata', 1, 399, 'transferencia', 'SPEI 9111', 'pendiente', null, now() - interval '13 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and reference = 'SPEI 9111');
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'rumbo-consultores'), 'plata', 1, 399, 'transferencia', 'SPEI 7707', 'pagado', current_date + -2, now() - interval '801 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and reference = 'SPEI 7707');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + -2, plan_status = public.billing_status('premium', current_date + -2) where slug = 'rumbo-consultores';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'rumbo-consultores'), 'premium', 1, 399, 'transferencia', 'SPEI 9111', 'pendiente', null, now() - interval '13 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and reference = 'SPEI 9111');
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'rumbo-consultores'), 'premium', 1, 399, 'transferencia', 'SPEI 7707', 'pagado', current_date + -2, now() - interval '802 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'rumbo-consultores') and reference = 'SPEI 7707');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -369,7 +369,7 @@ select 'Plomería Hernández', 'plomeria-hernandez', 'Plomero · servicio el mis
   (select id from public.zones where slug = 'queretaro'),
   '5214420000113', '5214420000113', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3272, 20.5998), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, null,
+  true, true, true, 'premium', 'activo', true, null,
   'Plomero', array['Fugas de agua', 'Calentadores', 'Destapes y drenaje', 'Tinacos y cisternas']::text[], '{}'::text[], 20, 'Certificación CONOCER en instalaciones hidráulicas', null, array['Español']::text[], array['domicilio']::text[], 250, 'Llega el mismo día', 'Atiende en todo Querétaro. Taller en Calle Bambú 12, junto a la tienda Don Beto.', true, 'Garantía de 3 meses por escrito', 'Banorte · CLABE 072 680 0098 7654 3210 · a nombre de José Hernández Ruiz', null, null
 where not exists (select 1 from public.businesses where slug = 'plomeria-hernandez');
 
@@ -393,8 +393,8 @@ insert into public.loyalty_programs (business_id, kind, goal, percent, reward) s
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'Sofía N.', 5, 'Llegó en una hora, encontró la fuga y dejó todo limpio.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and author_name = 'Sofía N.' and body = 'Llegó en una hora, encontró la fuga y dejó todo limpio.');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'Pedro S.', 5, 'Precio justo y explicó qué falló.', null, now() - interval '1 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and author_name = 'Pedro S.' and body = 'Precio justo y explicó qué falló.');
 update public.businesses set rating_avg = 4.8, rating_count = 156, verified = true where slug = 'plomeria-hernandez';
-update public.businesses set plan = 'oro', paid_plan = 'oro', paid_until = current_date + 40, plan_status = public.billing_status('oro', current_date + 40) where slug = 'plomeria-hernandez';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'oro', 1, 799, 'deposito', 'SPEI 7744', 'pagado', current_date + 40, now() - interval '0 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and reference = 'SPEI 7744');
+update public.businesses set plan = 'vip', paid_plan = 'vip', paid_until = current_date + 40, plan_status = public.billing_status('vip', current_date + 40) where slug = 'plomeria-hernandez';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'plomeria-hernandez'), 'vip', 1, 799, 'deposito', 'SPEI 7744', 'pagado', current_date + 40, now() - interval '0 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'plomeria-hernandez') and reference = 'SPEI 7744');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -403,7 +403,7 @@ select 'Eléctrica Ramírez', 'electrica-ramirez', 'Electricista · urgencias y 
   (select id from public.zones where slug = 'queretaro'),
   '5214420000114', '5214420000114', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3298, 20.6045), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, null,
+  true, true, true, 'premium', 'activo', true, null,
   'Electricista', array['Cortos y fallas', 'Instalaciones eléctricas', 'Paneles solares', 'Minisplits']::text[], array['climas']::text[], 16, 'Técnico electricista certificado por CFE', null, array['Español']::text[], array['domicilio']::text[], 300, 'Urgencias en 2 h', null, true, 'Garantía de 6 meses en instalaciones', null, null, null
 where not exists (select 1 from public.businesses where slug = 'electrica-ramirez');
 
@@ -422,8 +422,8 @@ insert into public.business_photos (business_id, url, caption, color, position) 
 insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'electrica-ramirez'), null, 'Tablero eléctrico nuevo', '#E2E7EF', 1 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and caption = 'Tablero eléctrico nuevo');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'electrica-ramirez'), 'Laura M.', 5, 'Resolvió un corto que otros no encontraron.', null, now() - interval '6 days' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and author_name = 'Laura M.' and body = 'Resolvió un corto que otros no encontraron.');
 update public.businesses set rating_avg = 4.9, rating_count = 88, verified = true where slug = 'electrica-ramirez';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + 12, plan_status = public.billing_status('plata', current_date + 12) where slug = 'electrica-ramirez';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'electrica-ramirez'), 'plata', 1, 399, 'transferencia', 'SPEI 7781', 'pagado', current_date + 12, now() - interval '465 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and reference = 'SPEI 7781');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + 12, plan_status = public.billing_status('premium', current_date + 12) where slug = 'electrica-ramirez';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'electrica-ramirez'), 'premium', 1, 399, 'transferencia', 'SPEI 7781', 'pagado', current_date + 12, now() - interval '466 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'electrica-ramirez') and reference = 'SPEI 7781');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -432,7 +432,7 @@ select 'Carpintería Don Chuy', 'carpinteria-don-chuy', 'Carpintero · cocinas y
   (select id from public.zones where slug = 'el-marques'),
   '5214420000115', '5214420000115', 'Calle Bambú 33 (taller)',
   extensions.st_setsrid(extensions.st_makepoint(-100.3289, 20.6066), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', false, null,
+  true, true, true, 'premium', 'activo', false, null,
   'Carpintero', array['Muebles a medida', 'Closets y cocinas', 'Reparación de muebles']::text[], '{}'::text[], 30, null, null, array['Español']::text[], array['domicilio', 'despacho']::text[], 0, 'Responde en menos de 1 día', 'Taller con portón verde, a un lado de la papelería.', false, 'Garantía de 1 año en herrajes', null, null, null
 where not exists (select 1 from public.businesses where slug = 'carpinteria-don-chuy');
 
@@ -453,7 +453,7 @@ insert into public.business_photos (business_id, url, caption, color, position) 
 insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), null, 'Librero empotrado', '#F3E9DC', 2 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and caption = 'Librero empotrado');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'carpinteria-don-chuy'), 'Marta L.', 5, 'La cocina quedó idéntica al diseño y a tiempo.', null, now() - interval '1 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'carpinteria-don-chuy') and author_name = 'Marta L.' and body = 'La cocina quedó idéntica al diseño y a tiempo.');
 update public.businesses set rating_avg = 4.7, rating_count = 61, verified = false where slug = 'carpinteria-don-chuy';
-update public.businesses set plan = 'basico', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'carpinteria-don-chuy';
+update public.businesses set plan = 'estandar', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'carpinteria-don-chuy';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -462,7 +462,7 @@ select 'Climas del Bajío', 'climas-del-bajio', 'Técnico · minisplits y refrig
   (select id from public.zones where slug = 'queretaro'),
   '5214420000116', '5214420000116', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3268, 20.5975), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, null,
+  true, true, true, 'premium', 'activo', true, null,
   'Técnico en refrigeración', array['Minisplits', 'Refrigeradores', 'Lavadoras y secadoras']::text[], '{}'::text[], 9, 'Certificación en refrigeración y aire acondicionado', null, array['Español']::text[], array['domicilio']::text[], 350, 'Responde en menos de 2 h', null, false, 'Garantía de 3 meses en reparaciones', null, null, null
 where not exists (select 1 from public.businesses where slug = 'climas-del-bajio');
 
@@ -479,8 +479,8 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'climas-del-bajio'), 'producto', 'Mantenimiento de 2 minisplits', 'Limpieza profunda y revisión de gas', 'Paquetes', 1100, null, true, 2 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'climas-del-bajio') and name = 'Mantenimiento de 2 minisplits');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'climas-del-bajio'), 'Rodrigo M.', 4, 'Buen servicio, llegó media hora tarde pero avisó.', null, now() - interval '2 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'climas-del-bajio') and author_name = 'Rodrigo M.' and body = 'Buen servicio, llegó media hora tarde pero avisó.');
 update public.businesses set rating_avg = 4.6, rating_count = 42, verified = true where slug = 'climas-del-bajio';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + 6, plan_status = public.billing_status('plata', current_date + 6) where slug = 'climas-del-bajio';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'climas-del-bajio'), 'plata', 1, 399, 'transferencia', 'SPEI 7855', 'pagado', current_date + 6, now() - interval '609 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'climas-del-bajio') and reference = 'SPEI 7855');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + 6, plan_status = public.billing_status('premium', current_date + 6) where slug = 'climas-del-bajio';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'climas-del-bajio'), 'premium', 1, 399, 'transferencia', 'SPEI 7855', 'pagado', current_date + 6, now() - interval '610 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'climas-del-bajio') and reference = 'SPEI 7855');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -489,7 +489,7 @@ select 'Acabados Mendoza', 'acabados-mendoza', 'Pintura e impermeabilización', 
   (select id from public.zones where slug = 'queretaro'),
   '5214420000117', '5214420000117', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3225, 20.6028), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', false, null,
+  true, true, true, 'premium', 'activo', false, null,
   'Maestro de obra', array['Pintura', 'Impermeabilización', 'Albañilería']::text[], '{}'::text[], 22, null, null, array['Español']::text[], array['domicilio']::text[], 0, 'Cotiza en 24 h', null, false, 'Garantía de 5 años en impermeabilización', null, null, null
 where not exists (select 1 from public.businesses where slug = 'acabados-mendoza');
 
@@ -505,8 +505,8 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.business_photos (business_id, url, caption, color, position) select (select id from public.businesses where slug = 'acabados-mendoza'), null, 'Azotea impermeabilizada, 120 m²', '#DDF1EA', 0 where not exists (select 1 from public.business_photos where business_id = (select id from public.businesses where slug = 'acabados-mendoza') and caption = 'Azotea impermeabilizada, 120 m²');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'acabados-mendoza'), 'Jorge V.', 5, 'Ya pasó la temporada de lluvias y cero goteras.', null, now() - interval '2 months' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'acabados-mendoza') and author_name = 'Jorge V.' and body = 'Ya pasó la temporada de lluvias y cero goteras.');
 update public.businesses set rating_avg = 4.5, rating_count = 37, verified = false where slug = 'acabados-mendoza';
-update public.businesses set plan = 'plata', paid_plan = 'plata', paid_until = current_date + 21, plan_status = public.billing_status('plata', current_date + 21) where slug = 'acabados-mendoza';
-insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'acabados-mendoza'), 'plata', 1, 399, 'deposito', 'SPEI 7892', 'pagado', current_date + 21, now() - interval '249 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'acabados-mendoza') and reference = 'SPEI 7892');
+update public.businesses set plan = 'premium', paid_plan = 'premium', paid_until = current_date + 21, plan_status = public.billing_status('premium', current_date + 21) where slug = 'acabados-mendoza';
+insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select (select id from public.businesses where slug = 'acabados-mendoza'), 'premium', 1, 399, 'deposito', 'SPEI 7892', 'pagado', current_date + 21, now() - interval '250 hours', null where not exists (select 1 from public.subscription_payments where business_id = (select id from public.businesses where slug = 'acabados-mendoza') and reference = 'SPEI 7892');
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
   profession, specialties, extra_categories, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
@@ -515,7 +515,7 @@ select 'Cerrajería Llave Maestra', 'cerrajeria-llave-maestra', 'Cerrajero · 24
   (select id from public.zones where slug = 'queretaro'),
   '5214420000118', '5214420000118', 'Av. 5 de Febrero 1500',
   extensions.st_setsrid(extensions.st_makepoint(-100.3338, 20.6052), 4326)::extensions.geography,
-  true, true, true, 'plata', 'activo', true, null,
+  true, true, true, 'premium', 'activo', true, null,
   'Cerrajero', array['Aperturas', 'Cambio de chapas', 'Llaves de auto']::text[], '{}'::text[], 13, null, null, array['Español']::text[], array['domicilio', 'despacho']::text[], 350, 'Llega en 40 min', 'Local con letrero amarillo, esquina con Av. Universidad.', true, 'Garantía de 1 año en chapas', null, null, null
 where not exists (select 1 from public.businesses where slug = 'cerrajeria-llave-maestra');
 
@@ -531,7 +531,7 @@ insert into public.catalog_items (business_id, kind, name, description, section,
 insert into public.catalog_items (business_id, kind, name, description, section, price, duration_min, is_available, position) select (select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 'cotizacion', 'Llave de auto con chip', 'Dinos marca y modelo', null, null, null, true, 1 where not exists (select 1 from public.catalog_items where business_id = (select id from public.businesses where slug = 'cerrajeria-llave-maestra') and name = 'Llave de auto con chip');
 insert into public.reviews (business_id, author_name, rating, body, reply, created_at) select (select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 'Lucía P.', 5, 'Llegó en media hora un domingo en la noche.', null, now() - interval '1 weeks' where not exists (select 1 from public.reviews where business_id = (select id from public.businesses where slug = 'cerrajeria-llave-maestra') and author_name = 'Lucía P.' and body = 'Llegó en media hora un domingo en la noche.');
 update public.businesses set rating_avg = 4.7, rating_count = 71, verified = true where slug = 'cerrajeria-llave-maestra';
-update public.businesses set plan = 'basico', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'cerrajeria-llave-maestra';
+update public.businesses set plan = 'estandar', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = 'cerrajeria-llave-maestra';
 
 -- Muro de la comunidad
 insert into public.posts (business_id, kind, title, body, specialty, price, price_note, likes_count, created_at) select (select id from public.businesses where slug = 'despacho-contable-reyes'), 'servicio', 'Declaración anual de personas físicas', 'Revisamos tus deducciones (médicos, colegiaturas, intereses) para que recuperes tu saldo a favor. Trae tu e.firma o te ayudamos a tramitarla.', 'Declaración anual', 1200, 'precio fijo', 34, now() - interval '2 hours' where not exists (select 1 from public.posts where title = 'Declaración anual de personas físicas');
