@@ -22,7 +22,8 @@ export default function ProfesionalInicio() {
   const fresh = state.requests.filter((r) => r.status === 'nueva');
   const pendingReviews = myBusiness.reviews.filter((r) => !r.reply && !state.replies[r.id]).length;
   const myPosts = state.posts.filter((p) => p.businessSlug === myBusiness.slug);
-  const income = state.sales.reduce((a, s) => a + s.amount, 0);
+  const today = new Date().toDateString();
+  const income = state.sales.filter((s) => new Date(s.createdAt).toDateString() === today).reduce((a, s) => a + s.amount, 0);
   void state.profileVersion;
 
   const tiles: { label: string; sub: string; icon: IconName; href: Href; badge?: number }[] = [
@@ -30,6 +31,8 @@ export default function ProfesionalInicio() {
     { label: 'Agenda', sub: 'Citas de la semana', icon: 'calendar-outline', href: '/mi-negocio/agenda' },
     { label: 'Servicios', sub: `${state.myItems.length} publicados`, icon: 'briefcase-outline', href: '/mi-negocio/productos' },
     { label: 'Publicar', sub: `${myPosts.length} en la comunidad`, icon: 'megaphone-outline', href: '/mi-negocio/publicar' },
+    { label: 'Cobrar', sub: 'Anotar o pedir un pago', icon: 'cash-outline', href: '/panel/cobrar' },
+    { label: 'Mi QR', sub: 'Para tarjetas y reseñas', icon: 'qr-code-outline', href: '/qr' },
   ];
 
   return (

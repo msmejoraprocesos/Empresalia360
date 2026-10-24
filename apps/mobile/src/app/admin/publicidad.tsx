@@ -6,6 +6,7 @@ import { Button, Chip } from '@/components/ui';
 import { Brand } from '@/constants/theme';
 import { AD_SLOTS } from '@/data/ads';
 import { money } from '@/lib/format';
+import { openWhatsApp } from '@/lib/links';
 import type { AdCampaign } from '@/store/app';
 import { useApp } from '@/store/app';
 
@@ -27,7 +28,7 @@ export default function AdminPublicidad() {
   return (
     <AdminShell title="Publicidad" subtitle="Espacios preferenciales y campañas" action={<Button label="Nueva campaña" small onPress={() => router.push('/admin/campana-nueva')} />}>
       <AdminCard>
-        <Text style={styles.h}>Ocupación · Zen House · noviembre</Text>
+        <Text style={styles.h}>Ocupación · Querétaro · noviembre</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ minWidth: 640, gap: 6, marginTop: 12 }}>
             <View style={styles.gridRow}>
@@ -76,7 +77,15 @@ export default function AdminPublicidad() {
             <Text style={styles.name}>{money(c.total)}</Text>
             <Chip label={st.text} color={st.bg} ink={st.fg} />
             {c.status === 'en_revision' ? <Button label="Aprobar" variant="success" small onPress={() => actions.setCampaignStatus(c.id, 'activa')} /> : null}
-            {c.status === 'por_pagar' ? <Button label="Reenviar liga de pago" variant="ghost" small /> : null}
+            {c.status === 'por_pagar' ? (
+              <Button
+                label="Recordarle el pago"
+                variant="ghost"
+                icon="logo-whatsapp"
+                small
+                onPress={() => openWhatsApp(`Hola, te recordamos tu campaña en Expertalia 360 (${c.slot}) por ${money(c.total)}. En cuanto se reciba el pago, se publica.`)}
+              />
+            ) : null}
           </AdminCard>
         );
       })}

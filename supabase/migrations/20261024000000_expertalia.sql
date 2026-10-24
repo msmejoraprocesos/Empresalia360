@@ -40,6 +40,7 @@ alter table public.businesses
   add column if not exists directions text,           -- referencias para llegar
   add column if not exists urgent24 boolean not null default false,
   add column if not exists warranty text,
+  add column if not exists payment_info text,         -- banco, CLABE y titular para transferencias
   add column if not exists available boolean not null default true,
   add column if not exists accepts_new boolean not null default true;
 

@@ -73,14 +73,14 @@ const out: string[] = [
 for (const b of BUSINESSES) {
   out.push(
     `insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,`,
-    `  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)`,
+    `  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)`,
     `select ${q(b.name)}, ${q(b.slug)}, ${q(b.subtitle)}, ${q(b.description)},`,
     `  (select id from public.categories where slug = ${q(b.categorySlug)}),`,
     `  (select id from public.zones where slug = ${q(slugify(b.zone))}),`,
     `  ${q(b.phone)}, ${q(b.phone)}, ${q(b.address)},`,
     `  extensions.st_setsrid(extensions.st_makepoint(${b.lng}, ${b.lat}), 4326)::extensions.geography,`,
     `  ${b.isOpen}, true, ${b.delivers}, 'plata', 'activo', ${b.verified}, ${q(b.promo)},`,
-    `  ${q(b.profession)}, ${arr(b.specialties)}, ${b.yearsExp}, ${q(b.license)}, ${q(b.education)}, ${arr(b.languages)}, ${arr(b.attends)}, ${q(b.consultPrice)}, ${q(b.responseTime)}, ${q(b.references)}, ${Boolean(b.urgent24)}, ${q(b.warranty)}, ${q(b.photo?.startsWith('http') ? b.photo : undefined)}, ${q(b.cover?.startsWith('http') ? b.cover : undefined)}`,
+    `  ${q(b.profession)}, ${arr(b.specialties)}, ${b.yearsExp}, ${q(b.license)}, ${q(b.education)}, ${arr(b.languages)}, ${arr(b.attends)}, ${q(b.consultPrice)}, ${q(b.responseTime)}, ${q(b.references)}, ${Boolean(b.urgent24)}, ${q(b.warranty)}, ${q(b.paymentInfo)}, ${q(b.photo?.startsWith('http') ? b.photo : undefined)}, ${q(b.cover?.startsWith('http') ? b.cover : undefined)}`,
     `where not exists (select 1 from public.businesses where slug = ${q(b.slug)});`,
     '',
   );

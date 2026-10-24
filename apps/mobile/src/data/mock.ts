@@ -941,6 +941,7 @@ export const INCOMING_REQUESTS: IncomingRequest[] = [
 const EXTRA: Record<string, Partial<Business>> = {
   'lic-mariana-ortiz': {
     references: 'Plaza Zen, planta alta, local 8. Frente al Oxxo; hay estacionamiento de la plaza.',
+    paymentInfo: 'BBVA · CLABE 012 680 0123 4567 8901 · a nombre de Mariana Ortiz Lara',
     gallery: [
       { id: 'g1', caption: 'Sala de juntas del despacho', color: '#DCE4F2' },
       { id: 'g2', caption: 'Recepción', color: '#E9E2FA' },
@@ -956,6 +957,7 @@ const EXTRA: Record<string, Partial<Business>> = {
     loyalty: { kind: 'sellos', goal: 12, reward: 'Un mes de contabilidad gratis' },
   },
   'plomeria-hernandez': {
+    paymentInfo: 'Banorte · CLABE 072 680 0098 7654 3210 · a nombre de José Hernández Ruiz',
     references: 'Atiende en todo Querétaro. Taller en Calle Bambú 12, junto a la tienda Don Beto.',
     urgent24: true,
     warranty: 'Garantía de 3 meses por escrito',

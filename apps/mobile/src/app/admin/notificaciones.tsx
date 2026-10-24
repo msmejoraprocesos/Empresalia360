@@ -6,8 +6,8 @@ import { Button, Chip, Field, OptionPill } from '@/components/ui';
 import { Brand } from '@/constants/theme';
 
 const AUDIENCES = [
-  { id: 'zona', label: 'Zen House', reach: 2300 },
-  { id: 'municipio', label: 'Todo El Marqués', reach: 4820 },
+  { id: 'zona', label: 'Querétaro Centro', reach: 2300 },
+  { id: 'municipio', label: 'Todo Querétaro', reach: 4820 },
   { id: 'fiscal', label: 'Buscaron contador', reach: 1240 },
   { id: 'inactivos', label: 'Sin pedir en 30 días', reach: 910 },
 ];

@@ -52,7 +52,7 @@ export default function Proveedor() {
 function RequestCard({ req }: { req: ProviderRequest }) {
   const { actions } = useApp();
   const [price, setPrice] = useState('');
-  const [ready, setReady] = useState('15 min');
+  const [ready, setReady] = useState('48 h');
   return (
     <Card style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -68,7 +68,7 @@ function RequestCard({ req }: { req: ProviderRequest }) {
           <Field label="Honorarios para el despacho" value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="$0" />
         </View>
         <View style={{ flex: 1 }}>
-          <Field label="Lista en" value={ready} onChangeText={setReady} />
+          <Field label="Entrega en" value={ready} onChangeText={setReady} placeholder="48 h, 3 días…" />
         </View>
       </View>
       <View style={{ flexDirection: 'row', gap: 10 }}>

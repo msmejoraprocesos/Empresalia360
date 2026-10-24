@@ -23,7 +23,7 @@ export default function Presupuesto() {
       <Header title={`Presupuesto · ${q.businessName}`} color={Brand.jacaranda} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 220 }}>
         <Card style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-          <IconCircle icon="car-outline" color={Brand.jacarandaSoft} ink={Brand.jacaranda} size={52} square />
+          <IconCircle icon="document-text-outline" color={Brand.jacarandaSoft} ink={Brand.jacaranda} size={52} square />
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{q.vehicle}</Text>
             <Text style={styles.sub}>{q.note}</Text>
@@ -51,7 +51,7 @@ export default function Presupuesto() {
         </Card>
         <View style={styles.protect}>
           <IconCircle icon="shield-checkmark-outline" color={Brand.nopalSoft} ink={Brand.nopalDark} size={36} />
-          <Text style={{ flex: 1, color: '#234A38', fontSize: 13 }}>Tu pago queda protegido hasta que confirmes que recibiste tu auto.</Text>
+          <Text style={{ flex: 1, color: '#234A38', fontSize: 13 }}>Al aprobar, el despacho empieza y te escribe para acordar el pago. Pagas directo a él.</Text>
         </View>
       </ScrollView>
       <BottomBar>
@@ -59,14 +59,14 @@ export default function Presupuesto() {
           <Text style={styles.total}>Total</Text>
           <Text style={styles.total}>{money(total)}</Text>
         </View>
-        <Text style={styles.sub}>{decided ? (q.status === 'aprobado' ? 'Aprobado y pagado. El profesional ya fue avisado.' : 'Rechazaste este presupuesto.') : q.readyText}</Text>
+        <Text style={styles.sub}>{decided ? (q.status === 'aprobado' ? 'Aprobado. El profesional ya fue avisado y te escribirá para el pago.' : 'Rechazaste este presupuesto.') : q.readyText}</Text>
         {!decided ? (
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Button label="Rechazar" variant="ghost" style={{ flex: 1 }} onPress={() => actions.setQuoteStatus(q.id, 'rechazado')} />
-            <Button label="Aprobar y pagar" style={{ flex: 2 }} onPress={() => actions.setQuoteStatus(q.id, 'aprobado')} />
+            <Button label="Aprobar" style={{ flex: 2 }} onPress={() => actions.setQuoteStatus(q.id, 'aprobado')} />
           </View>
         ) : (
-          <Button label="Volver a mis pedidos" variant="dark" onPress={() => router.back()} />
+          <Button label="Volver a mis citas" variant="dark" onPress={() => router.back()} />
         )}
       </BottomBar>
     </View>

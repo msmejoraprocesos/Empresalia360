@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card, Chip, EmptyState, Field, Header, Segmented, StarInput, Stars } from '@/components/ui';
+import { Button, Card, Chip, EmptyState, Field, Header, StarInput, Stars } from '@/components/ui';
 import { Brand, Radius } from '@/constants/theme';
 import { getBusiness } from '@/data';
 import { useBusinessScreen } from '@/lib/analytics';
@@ -12,12 +12,13 @@ import { useApp } from '@/store/app';
 const PAID: Record<string, string> = { efectivo: 'efectivo', tarjeta: 'tarjeta', transferencia: 'transferencia', liga: 'pago en línea' };
 
 export default function Resenas() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug, escribir } = useLocalSearchParams<{ slug: string; escribir?: string }>();
   const { state, actions } = useApp();
   const gate = useLoginGate();
   const b = getBusiness(slug);
-  const [tab, setTab] = useState<'expertalia' | 'google'>('expertalia');
-  const [writing, setWriting] = useState(false);
+  // Llegando desde el QR o la liga para calificar, se abre directo el formulario
+  const [writing, setWriting] = useState(Boolean(escribir));
+  const [thanks, setThanks] = useState(false);
   const [rating, setRating] = useState(5);
   const [body, setBody] = useState('');
   useBusinessScreen(b, 'resenas', 'vista_resenas');
@@ -30,23 +31,9 @@ export default function Resenas() {
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
-      <Header title="Reseñas" subtitle={b.name}>
-        <View style={{ marginTop: 14 }}>
-          <Segmented
-            dark
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'expertalia', label: `Expertalia 360 · ${b.rating.toFixed(1)}` },
-              { value: 'google', label: 'Google' },
-            ]}
-          />
-        </View>
-      </Header>
+      <Header title="Reseñas" subtitle={b.name} />
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
-        {tab === 'expertalia' ? (
-          <>
             <Card style={styles.summary}>
               <View style={{ alignItems: 'center', minWidth: 90 }}>
                 <Text style={styles.score}>{b.rating.toFixed(1)}</Text>
@@ -70,8 +57,8 @@ export default function Resenas() {
                 <Text style={styles.small}>lo recomiendan</Text>
               </Card>
               <Card style={{ flex: 1 }}>
-                <Text style={styles.statBig}>{state.favorites.includes(b.slug) ? 313 : 312}</Text>
-                <Text style={styles.small}>clientes lo guardaron</Text>
+                <Text style={styles.statBig}>{reviews.filter((r) => r.verified).length}</Text>
+                <Text style={styles.small}>con visita verificada</Text>
               </Card>
             </View>
 
@@ -87,8 +74,13 @@ export default function Resenas() {
                     actions.addReview(b.slug, rating, body.trim());
                     setWriting(false);
                     setBody('');
+                    setThanks(true);
                   })}
                 />
+              </Card>
+            ) : thanks ? (
+              <Card style={{ backgroundColor: Brand.nopalSoft }}>
+                <Text style={[styles.name, { color: Brand.nopalDark }]}>¡Gracias! Tu reseña ya se publicó y ganaste 50 puntos.</Text>
               </Card>
             ) : (
               <Button label="Escribir reseña" icon="create-outline" onPress={() => setWriting(true)} />
@@ -119,26 +111,6 @@ export default function Resenas() {
                 ) : null}
               </Card>
             ))}
-          </>
-        ) : (
-          <>
-            <Card style={styles.google}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={styles.googleTag}>[Logo de Google Maps]</Text>
-                <Text style={{ color: Brand.alberca, fontWeight: '700', fontSize: 12 }}>Ver en Google Maps</Text>
-              </View>
-              <Text style={[styles.body, { marginTop: 12 }]}>
-                Aquí se mostrará la calificación de Google y hasta 5 reseñas cuando se active la integración con Google Places.
-              </Text>
-              <Text style={[styles.small, { marginTop: 8 }]}>
-                Por las reglas de Google, se muestran por separado, con su logo, autor y liga a Google Maps, y no se promedian con las de Expertalia 360.
-              </Text>
-            </Card>
-            <Card style={{ backgroundColor: Brand.line }}>
-              <Text style={styles.small}>¿Eres el dueño? Conecta tu ficha de Google desde el modo negocio para traer todas tus reseñas y responderlas aquí.</Text>
-            </Card>
-          </>
-        )}
       </ScrollView>
     </View>
   );
@@ -155,6 +127,4 @@ const styles = StyleSheet.create({
   name: { fontSize: 15, fontWeight: '800', color: Brand.ink },
   body: { fontSize: 14, color: Brand.ink, lineHeight: 20, marginTop: 8 },
   reply: { marginTop: 10, padding: 10, borderRadius: Radius.sm, backgroundColor: '#F2F4F8' },
-  google: { borderWidth: 2, borderColor: '#D3D9E3' },
-  googleTag: { fontSize: 11, fontWeight: '800', color: Brand.inkSoft, borderWidth: 1, borderStyle: 'dashed', borderColor: Brand.inkMuted, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
 });

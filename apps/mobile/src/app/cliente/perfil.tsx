@@ -44,7 +44,6 @@ export default function Perfil() {
         ) : null}
         <Card style={{ paddingVertical: 4 }}>
           <ListRow icon="gift-outline" iconBg={Brand.mangoSoft} iconColor="#7A5600" title="Puntos, sellos y cupones" subtitle={`${state.points.toLocaleString('es-MX')} puntos`} onPress={() => router.push('/lealtad')} />
-          <ListRow icon="qr-code-outline" title="Mi QR" subtitle="Muéstralo al pagar para sumar sellos" onPress={() => router.push('/qr')} />
           <ListRow icon="calendar-outline" iconBg={Brand.albercaSoft} iconColor="#1757B8" title="Mis citas y cotizaciones" subtitle={`${state.orders.length} en tu historial`} onPress={() => router.push('/cliente/pedidos')} />
           <ListRow icon="people-outline" iconBg={Brand.nopalSoft} iconColor={Brand.nopalDark} title="Comunidad" subtitle="Servicios, consejos y eventos" onPress={() => router.push('/cliente/comunidad')} />
           <ListRow icon="heart-outline" iconBg={Brand.bugambiliaSoft} iconColor={Brand.bugambilia} title="Expertos guardados" subtitle={favs.map((b) => b!.name).join(', ') || 'Aún no guardas a nadie'} onPress={() => router.push('/cliente/explorar')} last />
@@ -77,8 +76,8 @@ export default function Perfil() {
 
         <Text style={styles.section}>Ayuda</Text>
         <Card style={{ paddingVertical: 4 }}>
-          <ListRow icon="chatbubble-ellipses-outline" title="Ayuda y soporte" onPress={() => {}} />
-          <ListRow icon="document-lock-outline" title="Aviso de privacidad" onPress={() => {}} />
+          <ListRow icon="chatbubble-ellipses-outline" title="Ayuda y soporte" subtitle="Preguntas frecuentes y contacto" onPress={() => router.push('/ayuda')} />
+          <ListRow icon="document-lock-outline" title="Aviso de privacidad" onPress={() => router.push('/privacidad')} />
           <ListRow
             icon="log-out-outline"
             title="Cerrar sesión"

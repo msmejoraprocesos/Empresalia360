@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -9,10 +9,10 @@ import { uploadPhoto } from '@/lib/photos';
 import { myBusiness, useApp } from '@/store/app';
 
 const TARGETS = [
-  { id: 'clientes', label: 'Mis clientes', sub: 'Quienes ya te compraron, por WhatsApp o app', reach: 412 },
+  { id: 'clientes', label: 'Mis clientes', sub: 'Quienes ya te contrataron por la app', reach: 412 },
   { id: 'inactivos', label: 'Clientes que no han vuelto', sub: 'Sin visita en 30 días', reach: 96 },
   { id: 'cerca', label: 'Personas cerca ahora', sub: 'Con ubicación y notificaciones activas', reach: 150 },
-  { id: 'zona', label: 'Toda mi zona', sub: 'Inicio de Zen House y Residencial del Parque', reach: 2300 },
+  { id: 'zona', label: 'Toda mi zona', sub: 'Aparece en el inicio de todos en tu zona', reach: 2300 },
 ];
 const RADII = [500, 800, 1200, 2000];
 
@@ -22,7 +22,8 @@ export default function PromocionNueva() {
   const [title, setTitle] = useState('Primera asesoría fiscal sin costo');
   const [limit, setLimit] = useState('100');
   const [until, setUntil] = useState('15 nov');
-  const [target, setTarget] = useState('clientes');
+  const { para } = useLocalSearchParams<{ para?: string }>();
+  const [target, setTarget] = useState(para === 'inactivos' ? 'inactivos' : 'clientes');
   const [radius, setRadius] = useState(800);
   const [photo, setPhoto] = useState<string>();
   const [saving, setSaving] = useState(false);

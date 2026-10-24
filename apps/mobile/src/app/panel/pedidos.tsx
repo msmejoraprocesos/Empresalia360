@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -70,6 +71,7 @@ function RequestCard({ r }: { r: IncomingRequest }) {
         <Chip label={st.text} color={st.bg} ink={st.fg} />
       </View>
       <Text style={styles.detail}>{r.detail}</Text>
+      {r.photo ? <Image source={{ uri: r.photo }} style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 12 }} contentFit="cover" accessibilityLabel="Foto que mandó el cliente" /> : null}
       <View style={styles.meta}>
         <Chip label={r.specialty} color={Brand.chileSoft} ink={Brand.chileDark} />
         <View style={styles.metaItem}>

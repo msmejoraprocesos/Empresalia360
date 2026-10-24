@@ -43,7 +43,7 @@ export type ProviderRequest = { id: string; from: string; distanceKm: number; pa
 export type MyPromotion = { id: string; title: string; target: string; reach: number; redemptions: number; active: boolean; photo?: string };
 export type Cart = { businessSlug: string | null; mode: OrderMode; lines: Record<string, number> };
 
-export type PendingBusiness = { id: string; name: string; category: string; zone: string; owner: string };
+export type PendingBusiness = { id: string; name: string; category: string; zone: string; owner: string; license?: string };
 export type ReportedReview = { id: string; business: string; author: string; rating: number; body: string; reason: string };
 
 /** Lo que el profesional puede cambiar de su perfil */
@@ -71,6 +71,7 @@ export type ProfilePatch = Partial<
     | 'references'
     | 'urgent24'
     | 'warranty'
+    | 'paymentInfo'
   >
 >;
 
@@ -108,6 +109,13 @@ type State = {
   myItems: CatalogItem[];
   sales: Sale[];
   requests: IncomingRequest[];
+  /** Citas que el profesional anota a mano (día AAAA-MM-DD) y horarios bloqueados ("día-hora") */
+  agenda: { day: string; time: string; who: string; what: string }[];
+  blocked: string[];
+  /** Reseñas que el profesional reportó */
+  reportedByMe: string[];
+  /** Campañas globales a las que se sumó el profesional */
+  joinedCampaigns: string[];
   replies: Record<string, string>;
   myAds: AdCampaign[];
   myPromotions: MyPromotion[];
@@ -176,12 +184,16 @@ const initialState: State = {
   biz: { disponible: true, nuevosClientes: true, enLinea: true },
   myItems: myBusiness.items,
   sales: online ? [] : [
-    { id: 's1', amount: 500, method: 'tarjeta', customerName: 'Ana G.', customerPhone: '4423180094', createdAt: Date.now() - 50 * 60000 },
-    { id: 's2', amount: 7000, method: 'transferencia', customerName: 'Lucía P.', createdAt: Date.now() - 95 * 60000 },
-    { id: 's3', amount: 500, method: 'efectivo', customerName: 'Pedro S.', createdAt: Date.now() - 130 * 60000 },
+    { id: 's1', amount: 500, method: 'tarjeta', customerName: 'Ana G.', concept: 'Consulta inicial', customerPhone: '4423180094', createdAt: Date.now() - 50 * 60000 },
+    { id: 's2', amount: 7000, method: 'transferencia', customerName: 'Lucía P.', concept: 'Divorcio voluntario · anticipo', createdAt: Date.now() - 95 * 60000 },
+    { id: 's3', amount: 500, method: 'efectivo', customerName: 'Pedro S.', concept: 'Consulta inicial', createdAt: Date.now() - 130 * 60000 },
   ],
   requests: online ? [] : INCOMING_REQUESTS,
   replies: {},
+  agenda: [],
+  blocked: [],
+  reportedByMe: [],
+  joinedCampaigns: [],
   myAds: [],
   myPromotions: online ? [] : [{ id: 'mp1', title: 'Primera consulta en línea a $350', target: 'Clientes nuevos', reach: 412, redemptions: 38, active: true }],
   supplyRequests: [
@@ -205,9 +217,9 @@ const initialState: State = {
     { id: 'pr2', from: 'Despacho Contable Reyes', distanceKm: 0.6, part: 'Testamento', vehicle: 'Cliente del despacho, 2 inmuebles', urgent: false, status: 'nueva' },
   ],
   pendingBusinesses: [
-    { id: 'pb1', name: 'Lic. Fernanda Ruiz', category: 'Abogados', zone: 'Juriquilla', owner: 'Fernanda R.' },
-    { id: 'pb2', name: 'Valuadores del Bajío', category: 'Arquitectura e ingeniería', zone: 'Centro Sur', owner: 'Ing. Ramos' },
-    { id: 'pb3', name: 'Electricista Saúl Cano', category: 'Electricidad', zone: 'El Marqués', owner: 'Saúl C.' },
+    { id: 'pb1', name: 'Lic. Fernanda Ruiz', category: 'Abogados', zone: 'Juriquilla', owner: 'Fernanda R.', license: 'Cédula 11234567 · Licenciatura en Derecho' },
+    { id: 'pb2', name: 'Valuadores del Bajío', category: 'Arquitectura e ingeniería', zone: 'Centro Sur', owner: 'Ing. Ramos', license: 'Cédula 8456120 · Ingeniería Civil' },
+    { id: 'pb3', name: 'Electricista Saúl Cano', category: 'Electricidad', zone: 'El Marqués', owner: 'Saúl C.', license: 'Certificado CONOCER EC0586 · instalaciones eléctricas' },
   ],
   reportedReviews: [
     { id: 'rr1', business: 'Acabados Mendoza', author: 'Usuario 2231', rating: 1, body: 'Pésimo, nunca vuelvo, el dueño es un...', reason: 'Lenguaje ofensivo' },
@@ -404,7 +416,7 @@ function useAppState() {
         });
       },
 
-      requestQuote: (q: { business: Business; item?: CatalogItem; description: string }) => {
+      requestQuote: (q: { business: Business; item?: CatalogItem; description: string; photo?: string }) => {
         track(q.business, 'cotizacion');
         if (online) {
           remote
@@ -415,7 +427,7 @@ function useAppState() {
           const id = uid();
           const requests: IncomingRequest[] =
             !online && q.business.slug === myBusiness.slug
-              ? [{ id, type: 'cotizacion', customer: `${s.userName} G.`, specialty: q.item?.section ?? q.business.specialties[0] ?? '', detail: `${q.item?.name ?? 'Cotización'} · ${q.description}`, when: 'Recibida ahora', attend: q.business.attends[0], status: 'nueva' }, ...s.requests]
+              ? [{ id, type: 'cotizacion', photo: q.photo, customer: `${s.userName} G.`, specialty: q.item?.section ?? q.business.specialties[0] ?? '', detail: `${q.item?.name ?? 'Cotización'} · ${q.description}`, when: 'Recibida ahora', attend: q.business.attends[0], status: 'nueva' }, ...s.requests]
               : s.requests;
           return {
             ...s,
@@ -528,12 +540,15 @@ function useAppState() {
       },
       toggleItem: (id: string) =>
         update((s) => ({ ...s, myItems: s.myItems.map((i) => (i.id === id ? { ...i, available: !i.available } : i)) })),
-      registerSale: (sale: { amount: number; method: PaymentMethod; customerPhone?: string; customerName?: string }) =>
+      registerSale: (sale: { amount: number; method: PaymentMethod; customerPhone?: string; customerName?: string; concept?: string; fromApp?: boolean }) => {
+        if (online) void remote.sale(myBusiness, sale);
         update((s) => {
-          // Cobrar con el celular del cliente le suma un sello en su tarjeta de lealtad
-          const stamps = sale.customerPhone ? { ...s.stamps, [MY_BUSINESS_SLUG]: (s.stamps[MY_BUSINESS_SLUG] ?? 0) + 1 } : s.stamps;
-          return { ...s, stamps, sales: [{ ...sale, id: uid(), createdAt: Date.now() }, ...s.sales] };
-        }),
+          // Si es un cliente de la app, se le suma una visita en su tarjeta de lealtad
+          const stamps = sale.fromApp ? { ...s.stamps, [myBusiness.slug]: (s.stamps[myBusiness.slug] ?? 0) + 1 } : s.stamps;
+          const { fromApp: _fromApp, ...rest } = sale;
+          return { ...s, stamps, sales: [{ ...rest, id: uid(), createdAt: Date.now() }, ...s.sales] };
+        });
+      },
       addPromotion: (p: Omit<MyPromotion, 'id' | 'redemptions' | 'active'>) => {
         const id = uid();
         // También aparece en "Promociones" del inicio de los clientes
@@ -581,6 +596,11 @@ function useAppState() {
           ),
         }));
       },
+      addAgenda: (a: { day: string; time: string; who: string; what: string }) => update((s) => ({ ...s, agenda: [...s.agenda, a] })),
+      toggleBlocked: (key: string) => update((s) => ({ ...s, blocked: s.blocked.includes(key) ? s.blocked.filter((b) => b !== key) : [...s.blocked, key] })),
+      toggleCampaign: (id: string) =>
+        update((s) => ({ ...s, joinedCampaigns: s.joinedCampaigns.includes(id) ? s.joinedCampaigns.filter((c) => c !== id) : [...s.joinedCampaigns, id] })),
+      reportReview: (reviewId: string) => update((s) => ({ ...s, reportedByMe: s.reportedByMe.includes(reviewId) ? s.reportedByMe : [...s.reportedByMe, reviewId] })),
       replyReview: (reviewId: string, text: string) => {
         if (online) void remote.replyReview(reviewId, text);
         update((s) => ({ ...s, replies: { ...s.replies, [reviewId]: text } }));

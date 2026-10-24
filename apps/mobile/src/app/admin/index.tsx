@@ -15,7 +15,7 @@ export default function AdminResumen() {
     { label: 'Publicidad y espacios preferenciales', value: adIncome },
     { label: 'Suscripciones de negocios', value: 24350 },
     { label: 'Comisión por pedidos', value: 15800 },
-    { label: 'Comisión por envíos y red', value: 4100 },
+    { label: 'Comisión por red de expertos', value: 4100 },
   ];
   const max = Math.max(...sources.map((s) => s.value));
   const total = sources.reduce((a, s) => a + s.value, 0);
@@ -29,7 +29,7 @@ export default function AdminResumen() {
   return (
     <AdminShell
       title="Resumen de la plataforma"
-      subtitle="Este mes · El Marqués · datos de ejemplo"
+      subtitle="Este mes · Querétaro · datos de ejemplo"
       action={<Button label="Nueva campaña de publicidad" small onPress={() => router.push('/admin/campana-nueva')} />}>
       <View style={styles.kpis}>
         {[

@@ -31,6 +31,7 @@ export default function NegocioResenas() {
                 <Text style={styles.small}>{r.dateLabel}</Text>
               </View>
               {r.verified ? <Chip label="Visita verificada" color={Brand.nopalSoft} ink={Brand.nopalDark} icon="checkmark" /> : null}
+              {state.reportedByMe.includes(r.id) ? <Text style={[styles.small, { color: '#8A5A00' }]}>La reportaste. Expertalia la revisa en 48 h; si rompe las reglas, se oculta.</Text> : null}
               <Text style={styles.body}>{r.body}</Text>
               {reply ? (
                 <View style={styles.reply}>
@@ -51,7 +52,14 @@ export default function NegocioResenas() {
                     accessibilityLabel={`Responder a ${r.author}`}
                   />
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Button label="Reportar" variant="ghost" small style={{ flex: 1 }} />
+                    <Button
+                      label={state.reportedByMe.includes(r.id) ? 'Reportada' : 'Reportar'}
+                      variant="ghost"
+                      small
+                      style={{ flex: 1 }}
+                      disabled={state.reportedByMe.includes(r.id)}
+                      onPress={() => actions.reportReview(r.id)}
+                    />
                     <Button
                       label="Responder"
                       variant="dark"

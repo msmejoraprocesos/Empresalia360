@@ -50,7 +50,7 @@ export default function Lealtad() {
             <Text style={styles.headline}>{left === 0 ? '¡Completaste tu tarjeta!' : left <= 2 ? `¡Te faltan ${left}!` : 'Vas muy bien'}</Text>
             <Text style={styles.reward}>Al completar: {b.loyalty?.reward}</Text>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, alignSelf: 'stretch' }}>
-              <Button label="Mostrar mi QR" style={{ flex: 1 }} onPress={() => router.push('/qr')} />
+              <Button label="Agendar otra vez" style={{ flex: 1 }} onPress={() => router.push(`/negocio/${b.slug}/reservar`)} />
               <Button label="Ver perfil" variant="ghost" style={{ flex: 1 }} onPress={() => {
                 markSource('favoritos');
                 router.push(`/negocio/${b.slug}`);
@@ -86,7 +86,8 @@ export default function Lealtad() {
           <Card style={{ marginTop: 16, backgroundColor: Brand.ink }}>
             <Text style={{ color: Brand.mango, fontWeight: '800' }}>¿Cómo gano puntos?</Text>
             <Text style={{ color: '#E3E8EF', marginTop: 6, lineHeight: 20 }}>
-              +20 por contratar o agendar, +50 por reseñar y +100 por recomendar a alguien. Solo da tu celular o muestra tu QR al pagar.
+              +20 por agendar o contratar, +50 por reseñar y +100 por recomendar a alguien. Con más puntos subes de nivel en la comunidad y te llegan mejores cupones.{'\n\n'}
+              Las visitas de cada tarjeta se suman solas cuando el experto anota tu pago. No necesitas enseñar nada.
             </Text>
           </Card>
         </View>

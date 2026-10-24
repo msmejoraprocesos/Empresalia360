@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AdminCard, AdminShell } from '@/components/admin-shell';
 import { Button, Chip, EmptyState } from '@/components/ui';
@@ -10,6 +11,7 @@ import { useApp } from '@/store/app';
 export default function AdminNegocios() {
   const { state, actions } = useApp();
   const router = useRouter();
+  const [docs, setDocs] = useState<string | null>(null);
   return (
     <AdminShell title="Negocios" subtitle={`${BUSINESSES.length} activos · ${state.pendingBusinesses.length} por aprobar`}>
       <Text style={styles.h}>Por aprobar</Text>
@@ -21,8 +23,16 @@ export default function AdminNegocios() {
             <Text style={styles.sub}>
               {b.category} · {b.zone} · dueño: {b.owner}
             </Text>
+            {docs === b.id ? (
+              <View style={{ marginTop: 6, gap: 4 }}>
+                <Text style={styles.name}>{b.license ?? 'Sin documento cargado'}</Text>
+                <Pressable accessibilityRole="link" onPress={() => Linking.openURL('https://www.cedulaprofesional.sep.gob.mx/')}>
+                  <Text style={{ color: Brand.alberca, fontWeight: '700', fontSize: 12 }}>Verificar cédula en el Registro Nacional de Profesionistas (SEP) ›</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
-          <Button label="Ver documentos" variant="ghost" small />
+          <Button label={docs === b.id ? 'Ocultar' : 'Ver documentos'} variant="ghost" small onPress={() => setDocs(docs === b.id ? null : b.id)} />
           <Button label="Aprobar" variant="success" small onPress={() => actions.approveBusiness(b.id)} />
         </AdminCard>
       ))}

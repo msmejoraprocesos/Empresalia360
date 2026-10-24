@@ -12,10 +12,10 @@ import { money } from '@/lib/format';
 import { useLoginGate } from '@/lib/auth';
 import { useApp } from '@/store/app';
 
+// La app todavía no cobra: el cliente le paga directo al experto.
 const METHODS: { value: PaymentMethod; label: string; sub: string }[] = [
-  { value: 'tarjeta', label: 'Tarjeta', sub: 'en la app' },
   { value: 'efectivo', label: 'Efectivo', sub: 'al atenderte' },
-  { value: 'transferencia', label: 'Transferencia', sub: 'CLABE o DiMo' },
+  { value: 'transferencia', label: 'Transferencia', sub: 'te damos sus datos' },
 ];
 
 export default function Pago() {
@@ -24,9 +24,9 @@ export default function Pago() {
   const { state, actions } = useApp();
   const gate = useLoginGate();
   const b = getBusiness(slug ?? state.cart.businessSlug ?? undefined);
-  const [method, setMethod] = useState<PaymentMethod>('tarjeta');
+  const [method, setMethod] = useState<PaymentMethod>('efectivo');
   const [note, setNote] = useState('');
-  const [address, setAddress] = useState('Calle Zen 214, Zen House');
+  const [address, setAddress] = useState('');
   const [locating, setLocating] = useState(false);
   const [located, setLocated] = useState<string | null>(null);
 
@@ -87,13 +87,14 @@ export default function Pago() {
               </View>
               <Button label={locating ? 'Buscando…' : 'Usar mi ubicación actual'} variant="ghost" icon="navigate" small onPress={locate} disabled={locating} />
               {located ? <Text style={styles.hint}>{located}</Text> : null}
-              <Field label="Dirección" value={address} onChangeText={setAddress} />
+              <Field label="Dirección" value={address} onChangeText={setAddress} placeholder="Calle, número y colonia" />
               <Field label="Referencias para llegar" value={note} onChangeText={setNote} placeholder="Casa blanca, portón negro, frente al parque" />
             </Card>
           </>
         ) : null}
 
-        <Text style={styles.label}>Pago</Text>
+        <Text style={styles.label}>¿Cómo le vas a pagar?</Text>
+        <Text style={styles.hint}>Le pagas directo a {b.name}. Expertalia 360 no cobra comisión al cliente. Pago con tarjeta en la app: próximamente.</Text>
         <View style={styles.row3}>
           {METHODS.map((m) => (
             <View key={m.value} style={{ flex: 1 }}>
@@ -114,7 +115,8 @@ export default function Pago() {
           <Text style={styles.total}>{money(total)}</Text>
         </View>
         <Button
-          label={method === 'efectivo' ? `Contratar y pagar al atenderte · ${money(total)}` : `Pagar ${money(total)}`}
+          label={method === 'efectivo' ? `Contratar · pagas al atenderte` : `Contratar · ver datos para transferir`}
+          disabled={delivery && !address.trim()}
           onPress={() => gate(() => {
             actions.placeOrder({ business: b, mode: state.cart.mode, method, total, note: delivery ? `${address}. ${note}` : undefined });
             router.replace('/pedido-confirmado');

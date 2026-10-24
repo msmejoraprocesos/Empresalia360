@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PhotoPicker } from '@/components/photo-picker';
 import { BottomBar, Button, Card, EmptyState, Field, Header, OptionPill } from '@/components/ui';
 import { Brand } from '@/constants/theme';
 import { getBusiness } from '@/data';
@@ -18,6 +19,7 @@ export default function Cotizar() {
   const quotable = b?.items.filter((i) => i.kind === 'cotizacion') ?? [];
   const [itemId, setItemId] = useState(itemParam ?? quotable[0]?.id);
   const [description, setDescription] = useState('');
+  const [photo, setPhoto] = useState<string>();
   const [when, setWhen] = useState<'hoy' | 'semana' | 'flexible'>('semana');
   const [sent, setSent] = useState(false);
 
@@ -59,7 +61,7 @@ export default function Cotizar() {
             value={description}
             onChangeText={setDescription}
             multiline
-            placeholder={item?.description ?? 'Describe lo que necesitas, con medidas, modelo o detalles.'}
+            placeholder="Cuenta qué pasó y qué necesitas. Ej. medidas, fechas, documentos que tienes."
           />
           <Text style={styles.label}>¿Para cuándo?</Text>
           <View style={styles.wrap}>
@@ -67,9 +69,9 @@ export default function Cotizar() {
             <OptionPill label="Esta semana" selected={when === 'semana'} onPress={() => setWhen('semana')} />
             <OptionPill label="Sin prisa" selected={when === 'flexible'} onPress={() => setWhen('flexible')} />
           </View>
-          <Button label="Agregar foto" variant="ghost" icon="camera-outline" small />
+          <PhotoPicker label="Foto (opcional)" value={photo} onChange={setPhoto} hint="Una foto del problema ayuda a cotizar mejor: la fuga, el documento, el lugar" />
         </Card>
-        <Text style={styles.text}>Tu teléfono no se comparte; el negocio te responde dentro de la app.</Text>
+        <Text style={styles.text}>Tu teléfono no se comparte; el experto te responde dentro de la app.</Text>
       </ScrollView>
       <BottomBar>
         <Button
@@ -77,7 +79,7 @@ export default function Cotizar() {
           disabled={description.trim().length < 5}
           onPress={() => gate(() => {
             if (item) track(b, 'seleccion', { itemId: item.id });
-            actions.requestQuote({ business: b, item, description });
+            actions.requestQuote({ business: b, item, description, photo });
             setSent(true);
           })}
           style={{ backgroundColor: Brand.jacaranda }}

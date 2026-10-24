@@ -1,18 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { QrCode } from '@/components/qr-code';
 import { EmptyState, RoundIconButton } from '@/components/ui';
 import { Brand, Radius } from '@/constants/theme';
 import { categoryBySlug, getBusiness } from '@/data';
 import type { IconName } from '@/data/types';
 import { useBusinessScreen } from '@/lib/analytics';
+import { profileLink, shareText, waNumber } from '@/lib/links';
 
 /**
- * Mini sitio público del negocio (liga + QR), al estilo de una página de enlaces.
- * En producción vive en expertalia360.mx/<slug> para quien no tiene la app.
+ * Mini sitio público del experto: es lo que se abre al escanear su QR o su liga
+ * (PUBLIC_URL?p=<slug>), para quien no tiene la app.
  */
 export default function MiniSitio() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -22,7 +22,7 @@ export default function MiniSitio() {
   useBusinessScreen(b, 'mini_sitio', 'vista_perfil', 'mini_sitio');
   if (!b) return <EmptyState icon="globe-outline" title="Sitio no encontrado" text="" />;
   const cat = categoryBySlug(b.categorySlug);
-  const url = `https://expertalia360.mx/${b.slug}`;
+  const url = profileLink(b.slug);
 
   const links: { label: string; icon: IconName; onPress: () => void; style: 'primary' | 'light' | 'dark' }[] = [
     {
@@ -31,19 +31,21 @@ export default function MiniSitio() {
       style: 'primary',
       onPress: () => router.push((b.modules.includes('reservar') ? `/negocio/${b.slug}/reservar` : `/negocio/${b.slug}/cotizar`) as Href),
     },
-    { label: 'Escríbenos por WhatsApp', icon: 'logo-whatsapp', style: 'light', onPress: () => Linking.openURL(`https://wa.me/${b.phone}`) },
-    { label: 'Cómo llegar', icon: 'location-outline', style: 'dark', onPress: () => router.push('/mapa') },
+    { label: 'Escríbenos por WhatsApp', icon: 'logo-whatsapp', style: 'light', onPress: () => Linking.openURL(`https://wa.me/${waNumber(b.phone)}`) },
+    { label: 'Cómo llegar', icon: 'location-outline', style: 'dark', onPress: () => router.push(`/mapa?slug=${b.slug}`) },
     { label: 'Déjanos tu reseña', icon: 'star-outline', style: 'dark', onPress: () => router.push(`/negocio/${b.slug}/resenas`) },
   ];
 
   return (
     <ScrollView style={{ backgroundColor: '#1B2438' }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 30, paddingHorizontal: 22 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <RoundIconButton icon="chevron-back" label="Volver" bg="#2A3550" color={Brand.white} onPress={() => router.back()} />
+        <RoundIconButton icon="chevron-back" label="Volver" bg="#2A3550" color={Brand.white} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         <View style={styles.url}>
-          <Text style={{ color: '#B9C2D2', fontSize: 12 }}>expertalia360.mx/{b.slug}</Text>
+          <Text style={{ color: '#B9C2D2', fontSize: 12 }} numberOfLines={1}>
+            Expertalia 360 · {b.profession}
+          </Text>
         </View>
-        <RoundIconButton icon="share-outline" label="Compartir liga" bg="#2A3550" color={Brand.white} onPress={() => Share.share({ message: `${b.name} en Expertalia 360: ${url}` })} />
+        <RoundIconButton icon="share-outline" label="Compartir liga" bg="#2A3550" color={Brand.white} onPress={() => shareText(`${b.name} en Expertalia 360: ${url}`)} />
       </View>
 
       <View style={{ alignItems: 'center', marginTop: 26 }}>
@@ -83,16 +85,15 @@ export default function MiniSitio() {
         </View>
       ) : null}
 
-      <View style={styles.qrBox}>
-        <QrCode value={url} size={150} />
-        <Text style={{ color: Brand.ink, fontWeight: '800', marginTop: 10 }}>Imprime tu QR para el mostrador</Text>
-        <Text style={{ color: Brand.inkSoft, fontSize: 12, marginTop: 2 }}>{url}</Text>
-      </View>
+      <Pressable accessibilityRole="button" onPress={() => router.push(`/negocio/${b.slug}`)} style={styles.more}>
+        <Text style={{ color: '#B9C2D2', fontWeight: '800' }}>Ver perfil completo, servicios y reseñas ›</Text>
+      </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  more: { alignItems: 'center', paddingVertical: 18 },
   url: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: '#2A3550' },
   logo: { width: 96, height: 96, borderRadius: 48, borderWidth: 4, borderColor: Brand.chile, alignItems: 'center', justifyContent: 'center' },
   name: { color: Brand.white, fontSize: 28, fontWeight: '800', marginTop: 14, textAlign: 'center' },
@@ -101,5 +102,4 @@ const styles = StyleSheet.create({
   link: { height: 56, borderRadius: Radius.lg, backgroundColor: '#2A3550', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   linkText: { color: Brand.white, fontSize: 16, fontWeight: '700' },
   promo: { marginTop: 18, padding: 14, borderRadius: Radius.lg, backgroundColor: Brand.mangoSoft },
-  qrBox: { marginTop: 18, padding: 18, borderRadius: Radius.lg, backgroundColor: Brand.white, alignItems: 'center' },
 });

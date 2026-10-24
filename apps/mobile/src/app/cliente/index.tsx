@@ -36,11 +36,11 @@ const FREQUENT: { label: string; q: string; g: 'profesionales' | 'oficios'; emoj
   { label: 'Clima', q: 'minisplit', g: 'oficios', emoji: 'copo' },
 ];
 
-const QUICK: { label: string; emoji: EmojiName; href: '/mapa' | '/lealtad' | '/qr' | '/cliente/comunidad' }[] = [
+const QUICK: { label: string; emoji: EmojiName; href: '/mapa' | '/lealtad' | '/cliente/pedidos' | '/cliente/comunidad' }[] = [
   { label: 'Mapa', emoji: 'mapa', href: '/mapa' },
   { label: 'Preguntar', emoji: 'mano_arriba', href: '/cliente/comunidad' },
   { label: 'Regalos', emoji: 'regalo', href: '/lealtad' },
-  { label: 'Mi QR', emoji: 'celular_flecha', href: '/qr' },
+  { label: 'Mis citas', emoji: 'calendario', href: '/cliente/pedidos' },
 ];
 
 const PROMO_STYLE: Record<string, { bg: string; fg: string; emoji: EmojiName }> = {

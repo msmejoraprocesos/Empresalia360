@@ -1,14 +1,22 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { BottomBar, Button, Card, EmptyState, Header } from '@/components/ui';
 import { Brand } from '@/constants/theme';
 import { useApp } from '@/store/app';
 
+const CAMPAIGNS = [
+  { id: 'declaraciones', name: 'Temporada de declaraciones', detail: 'Contadores · hasta el 30 de abril · tu oferta con -15%' },
+  { id: 'buen-fin', name: 'Buen Fin profesional', detail: 'Todas las especialidades · 14 al 17 de noviembre' },
+  { id: 'testamento', name: 'Mes del testamento', detail: 'Abogados y notarías · septiembre' },
+];
+
 export default function Promociones() {
   const router = useRouter();
   const { state, actions } = useApp();
+  const [showCampaigns, setShowCampaigns] = useState(false);
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
@@ -17,7 +25,25 @@ export default function Promociones() {
         <Card style={{ backgroundColor: Brand.mangoSoft }}>
           <Text style={{ fontWeight: '800', color: '#5A3E00' }}>Promociones globales de Expertalia 360</Text>
           <Text style={{ color: '#5A3E00', marginTop: 4, fontSize: 13 }}>Súmate a la Temporada de declaraciones o al Buen Fin profesional y aparece en el inicio de toda tu zona.</Text>
-          <Button label="Ver campañas abiertas" variant="dark" small style={{ marginTop: 10, alignSelf: 'flex-start' }} />
+          {showCampaigns ? (
+            <View style={{ gap: 8, marginTop: 10 }}>
+              {CAMPAIGNS.map((c) => {
+                const on = state.joinedCampaigns.includes(c.id);
+                return (
+                  <View key={c.id} style={styles.campaign}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.name}>{c.name}</Text>
+                      <Text style={styles.sub}>{c.detail}</Text>
+                    </View>
+                    <Button label={on ? 'Ya estás' : 'Sumarme'} small variant={on ? 'ghost' : 'primary'} icon={on ? 'checkmark' : undefined} onPress={() => actions.toggleCampaign(c.id)} />
+                  </View>
+                );
+              })}
+              <Text style={[styles.sub, { color: '#5A3E00' }]}>Sumarte es gratis. Tu oferta sale en el inicio de la zona durante la campaña.</Text>
+            </View>
+          ) : (
+            <Button label="Ver campañas abiertas" variant="dark" small style={{ marginTop: 10, alignSelf: 'flex-start' }} onPress={() => setShowCampaigns(true)} />
+          )}
         </Card>
         {state.myPromotions.map((p) => (
           <Card key={p.id} style={{ gap: 8 }}>
@@ -55,4 +81,5 @@ const styles = StyleSheet.create({
   sub: { fontSize: 12, color: Brand.inkSoft },
   stat: { flex: 1, padding: 10, borderRadius: 12, backgroundColor: Brand.tortilla },
   statBig: { fontSize: 18, fontWeight: '800', color: Brand.ink },
+  campaign: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Brand.white, borderRadius: 14, padding: 12 },
 });

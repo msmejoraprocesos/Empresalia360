@@ -4,14 +4,14 @@
 -- Para borrarlos todos: delete from public.businesses where owner_id is null;
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Lic. Mariana Ortiz', 'lic-mariana-ortiz', 'Abogada · familiar y civil', 'Te acompaño en divorcios, pensiones alimenticias, custodia, testamentos y juicios de arrendamiento. Explico cada paso con claridad y te doy cotización por escrito antes de empezar.',
   (select id from public.categories where slug = 'abogados'),
   (select id from public.zones where slug = 'queretaro-centro'),
   '5214420000101', '5214420000101', 'Plaza Zen, local 8',
   extensions.st_setsrid(extensions.st_makepoint(-100.3254, 20.6012), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, 'Primera consulta en línea a $350',
-  'Abogada', array['Familiar', 'Civil e inmobiliario']::text[], 12, 'Cédula 7845120', 'Licenciatura en Derecho, UAQ · Maestría en Derecho Familiar', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 500, 'Responde en menos de 2 h', 'Plaza Zen, planta alta, local 8. Frente al Oxxo; hay estacionamiento de la plaza.', false, null, null, null
+  'Abogada', array['Familiar', 'Civil e inmobiliario']::text[], 12, 'Cédula 7845120', 'Licenciatura en Derecho, UAQ · Maestría en Derecho Familiar', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 500, 'Responde en menos de 2 h', 'Plaza Zen, planta alta, local 8. Frente al Oxxo; hay estacionamiento de la plaza.', false, null, 'BBVA · CLABE 012 680 0123 4567 8901 · a nombre de Mariana Ortiz Lara', null, null
 where not exists (select 1 from public.businesses where slug = 'lic-mariana-ortiz');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-mariana-ortiz'), 'reservar') on conflict do nothing;
@@ -39,14 +39,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 5.0, rating_count = 41, verified = true where slug = 'lic-mariana-ortiz';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Ortiz Salinas Abogados', 'ortiz-salinas-abogados', 'Despacho · empresas y fiscal', 'Constitución de sociedades, contratos, defensa fiscal y laboral para empresas. Igualas mensuales para PyMEs.',
   (select id from public.categories where slug = 'abogados'),
   (select id from public.zones where slug = 'centro-sur'),
   '5214420000102', '5214420000102', 'Blvd. Bernardo Quintana 450, piso 7',
   extensions.st_setsrid(extensions.st_makepoint(-100.3265, 20.6041), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, null,
-  'Despacho de abogados', array['Mercantil y corporativo', 'Fiscal', 'Laboral']::text[], 18, '6 abogados con cédula verificada', 'Socios egresados de la Escuela Libre de Derecho y el ITAM', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 1200, 'Responde el mismo día', null, false, null, null, null
+  'Despacho de abogados', array['Mercantil y corporativo', 'Fiscal', 'Laboral']::text[], 18, '6 abogados con cédula verificada', 'Socios egresados de la Escuela Libre de Derecho y el ITAM', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 1200, 'Responde el mismo día', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'ortiz-salinas-abogados');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'ortiz-salinas-abogados'), 'reservar') on conflict do nothing;
@@ -68,14 +68,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.8, rating_count = 67, verified = true where slug = 'ortiz-salinas-abogados';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Lic. Roberto Campos', 'lic-roberto-campos', 'Abogado · laboral', 'Despidos injustificados, finiquitos, demandas y conciliación laboral. Reviso tu caso sin costo y solo cobro si recuperas.',
   (select id from public.categories where slug = 'abogados'),
   (select id from public.zones where slug = 'centro-historico'),
   '5214420000103', '5214420000103', 'Calle Madero 33, despacho 2',
   extensions.st_setsrid(extensions.st_makepoint(-100.3318, 20.6008), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, null,
-  'Abogado', array['Laboral']::text[], 9, 'Cédula 9120334', 'Licenciatura en Derecho, UNAM', array['Español']::text[], array['despacho', 'en_linea']::text[], 0, 'Responde en menos de 1 h', null, false, null, null, null
+  'Abogado', array['Laboral']::text[], 9, 'Cédula 9120334', 'Licenciatura en Derecho, UNAM', array['Español']::text[], array['despacho', 'en_linea']::text[], 0, 'Responde en menos de 1 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'lic-roberto-campos');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-roberto-campos'), 'reservar') on conflict do nothing;
@@ -94,14 +94,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.7, rating_count = 58, verified = true where slug = 'lic-roberto-campos';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Lic. Daniela Treviño', 'lic-daniela-trevino', 'Abogada · migratorio y penal', 'Residencias, regularización migratoria, naturalización y defensa penal. Atiendo en tres idiomas.',
   (select id from public.categories where slug = 'abogados'),
   (select id from public.zones where slug = 'juriquilla'),
   '5214420000104', '5214420000104', 'Atención en línea',
   extensions.st_setsrid(extensions.st_makepoint(-100.3335, 20.5985), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, null,
-  'Abogada', array['Migratorio', 'Penal']::text[], 7, 'Cédula 10233871', 'Licenciatura en Derecho, Tec de Monterrey', array['Español', 'Inglés', 'Francés']::text[], array['en_linea', 'despacho']::text[], 600, 'Responde en menos de 3 h', null, false, null, null, null
+  'Abogada', array['Migratorio', 'Penal']::text[], 7, 'Cédula 10233871', 'Licenciatura en Derecho, Tec de Monterrey', array['Español', 'Inglés', 'Francés']::text[], array['en_linea', 'despacho']::text[], 600, 'Responde en menos de 3 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'lic-daniela-trevino');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'lic-daniela-trevino'), 'reservar') on conflict do nothing;
@@ -121,14 +121,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.9, rating_count = 33, verified = true where slug = 'lic-daniela-trevino';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Despacho Contable Reyes', 'despacho-contable-reyes', 'Contadores · personas y empresas', 'Contabilidad mensual, declaraciones, nómina y defensa ante el SAT para personas físicas, RESICO y PyMEs.',
   (select id from public.categories where slug = 'contadores'),
   (select id from public.zones where slug = 'queretaro-centro'),
   '5214420000105', '5214420000105', 'Av. Zaragoza 120, piso 3',
   extensions.st_setsrid(extensions.st_makepoint(-100.3301, 20.6022), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, null,
-  'Contadores públicos', array['Declaración anual', 'Contabilidad de empresas', 'Defensa ante el SAT', 'Nómina e IMSS']::text[], 15, 'C.P.C. Héctor Reyes · Cédula 4410982', 'Contaduría Pública, UAQ · Certificación IMCP', array['Español']::text[], array['despacho', 'en_linea']::text[], 0, 'Responde el mismo día', 'Edificio gris de 4 pisos, piso 3. Entrada por Zaragoza, a media cuadra del jardín.', false, null, null, null
+  'Contadores públicos', array['Declaración anual', 'Contabilidad de empresas', 'Defensa ante el SAT', 'Nómina e IMSS']::text[], 15, 'C.P.C. Héctor Reyes · Cédula 4410982', 'Contaduría Pública, UAQ · Certificación IMCP', array['Español']::text[], array['despacho', 'en_linea']::text[], 0, 'Responde el mismo día', 'Edificio gris de 4 pisos, piso 3. Entrada por Zaragoza, a media cuadra del jardín.', false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'despacho-contable-reyes');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'despacho-contable-reyes'), 'reservar') on conflict do nothing;
@@ -157,14 +157,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.9, rating_count = 132, verified = true where slug = 'despacho-contable-reyes';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'C.P. Laura Méndez', 'cp-laura-mendez', 'Contadora · freelancers y RESICO', 'Declaraciones para freelancers, creadores de contenido y pequeños negocios. Todo en línea, sin papeles.',
   (select id from public.categories where slug = 'contadores'),
   (select id from public.zones where slug = 'juriquilla'),
   '5214420000106', '5214420000106', 'Atención en línea',
   extensions.st_setsrid(extensions.st_makepoint(-100.3302, 20.5979), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, null,
-  'Contadora', array['RESICO y personas físicas', 'Declaración anual', 'Facturación']::text[], 6, 'Cédula 11092376', 'Contaduría, UVM', array['Español']::text[], array['en_linea']::text[], 350, 'Responde en menos de 1 h', null, false, null, null, null
+  'Contadora', array['RESICO y personas físicas', 'Declaración anual', 'Facturación']::text[], 6, 'Cédula 11092376', 'Contaduría, UVM', array['Español']::text[], array['en_linea']::text[], 350, 'Responde en menos de 1 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'cp-laura-mendez');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'cp-laura-mendez'), 'reservar') on conflict do nothing;
@@ -185,14 +185,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.8, rating_count = 94, verified = true where slug = 'cp-laura-mendez';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Notaría Pública 14', 'notaria-publica-14', 'Notaría · escrituras y testamentos', 'Escrituras, testamentos, poderes y actas constitutivas. Cotización por escrito en 24 horas.',
   (select id from public.categories where slug = 'notarias-y-tramites'),
   (select id from public.zones where slug = 'centro-sur'),
   '5214420000107', '5214420000107', 'Av. Universidad 280',
   extensions.st_setsrid(extensions.st_makepoint(-100.3342, 20.6031), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, null,
-  'Notaría', array['Escrituras', 'Testamentos', 'Poderes notariales']::text[], 25, 'Lic. Andrade · Notario titular', null, array['Español']::text[], array['despacho']::text[], 0, 'Cotiza en 24 h', 'Casona amarilla frente a la Facultad de Derecho. Estacionamiento en la parte trasera.', false, null, null, null
+  'Notaría', array['Escrituras', 'Testamentos', 'Poderes notariales']::text[], 25, 'Lic. Andrade · Notario titular', null, array['Español']::text[], array['despacho']::text[], 0, 'Cotiza en 24 h', 'Casona amarilla frente a la Facultad de Derecho. Estacionamiento en la parte trasera.', false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'notaria-publica-14');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'notaria-publica-14'), 'reservar') on conflict do nothing;
@@ -211,14 +211,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.6, rating_count = 112, verified = true where slug = 'notaria-publica-14';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Traducciones Peritas Morales', 'traducciones-peritas-morales', 'Perito traductor · inglés y francés', 'Traducciones certificadas de actas, títulos, contratos y expedientes para juicios o trámites migratorios.',
   (select id from public.categories where slug = 'notarias-y-tramites'),
   (select id from public.zones where slug = 'centro-historico'),
   '5214420000108', '5214420000108', 'Calle Hidalgo 77',
   extensions.st_setsrid(extensions.st_makepoint(-100.3312, 20.6058), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, null,
-  'Perito traductor', array['Traducción certificada']::text[], 11, 'Perito autorizado por el Tribunal Superior de Justicia', null, array['Español', 'Inglés', 'Francés']::text[], array['despacho', 'en_linea']::text[], null, 'Entrega en 48 h', null, false, null, null, null
+  'Perito traductor', array['Traducción certificada']::text[], 11, 'Perito autorizado por el Tribunal Superior de Justicia', null, array['Español', 'Inglés', 'Francés']::text[], array['despacho', 'en_linea']::text[], null, 'Entrega en 48 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'traducciones-peritas-morales');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'traducciones-peritas-morales'), 'cotizar') on conflict do nothing;
@@ -236,14 +236,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.9, rating_count = 49, verified = true where slug = 'traducciones-peritas-morales';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Psic. Andrea Vidal', 'psic-andrea-vidal', 'Psicóloga · adultos y parejas', 'Terapia individual y de pareja, presencial o en línea. Enfoque cognitivo conductual.',
   (select id from public.categories where slug = 'psicologia-y-salud'),
   (select id from public.zones where slug = 'juriquilla'),
   '5214420000109', '5214420000109', 'Calle Jazmín 41, consultorio 2',
   extensions.st_setsrid(extensions.st_makepoint(-100.3355, 20.5995), 4326)::extensions.geography,
   true, true, false, 'plata', 'activo', true, null,
-  'Psicóloga', array['Terapia individual', 'Terapia de pareja', 'Ansiedad y estrés']::text[], 10, 'Cédula 8031457', 'Maestría en Psicoterapia Cognitivo Conductual', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 700, 'Responde en menos de 4 h', 'Consultorio 2, planta baja. Timbre con el nombre "Vidal".', false, null, null, null
+  'Psicóloga', array['Terapia individual', 'Terapia de pareja', 'Ansiedad y estrés']::text[], 10, 'Cédula 8031457', 'Maestría en Psicoterapia Cognitivo Conductual', array['Español', 'Inglés']::text[], array['despacho', 'en_linea']::text[], 700, 'Responde en menos de 4 h', 'Consultorio 2, planta baja. Timbre con el nombre "Vidal".', false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'psic-andrea-vidal');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'psic-andrea-vidal'), 'reservar') on conflict do nothing;
@@ -262,14 +262,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.9, rating_count = 87, verified = true where slug = 'psic-andrea-vidal';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Arq. Diego Fuentes', 'arq-diego-fuentes', 'Arquitecto · proyectos y licencias', 'Planos, remodelaciones, licencias de construcción y dirección de obra. La visita de levantamiento se descuenta del proyecto.',
   (select id from public.categories where slug = 'arquitectura'),
   (select id from public.zones where slug = 'el-marques'),
   '5214420000110', '5214420000110', 'Av. Industrial 102',
   extensions.st_setsrid(extensions.st_makepoint(-100.3235, 20.6015), 4326)::extensions.geography,
   false, true, true, 'plata', 'activo', true, null,
-  'Arquitecto', array['Proyecto arquitectónico', 'Licencias de construcción', 'Remodelación']::text[], 14, 'Cédula 5520981 · DRO registrado', 'Arquitectura, UAQ', array['Español']::text[], array['domicilio', 'despacho']::text[], 800, 'Responde en menos de 1 día', null, false, null, null, null
+  'Arquitecto', array['Proyecto arquitectónico', 'Licencias de construcción', 'Remodelación']::text[], 14, 'Cédula 5520981 · DRO registrado', 'Arquitectura, UAQ', array['Español']::text[], array['domicilio', 'despacho']::text[], 800, 'Responde en menos de 1 día', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'arq-diego-fuentes');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 'reservar') on conflict do nothing;
@@ -290,14 +290,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.7, rating_count = 29, verified = true where slug = 'arq-diego-fuentes';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Patricia Luna', 'patricia-luna-seguros', 'Asesora de seguros · vida y gastos médicos', 'Comparo varias aseguradoras y te explico cada cobertura sin presiones. Revisión de pólizas sin costo.',
   (select id from public.categories where slug = 'consultoria'),
   (select id from public.zones where slug = 'queretaro-centro'),
   '5214420000111', '5214420000111', 'Plaza Zen, local 15',
   extensions.st_setsrid(extensions.st_makepoint(-100.3281, 20.6005), 4326)::extensions.geography,
   true, true, true, 'plata', 'activo', true, null,
-  'Asesora de seguros', array['Seguros de gastos médicos', 'Seguros de vida y retiro']::text[], 8, 'Cédula CNSF A-120394', null, array['Español']::text[], array['despacho', 'en_linea', 'domicilio']::text[], 0, 'Responde en menos de 1 h', null, false, null, null, null
+  'Asesora de seguros', array['Seguros de gastos médicos', 'Seguros de vida y retiro']::text[], 8, 'Cédula CNSF A-120394', null, array['Español']::text[], array['despacho', 'en_linea', 'domicilio']::text[], 0, 'Responde en menos de 1 h', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'patricia-luna-seguros');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'patricia-luna-seguros'), 'reservar') on conflict do nothing;
@@ -316,14 +316,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.8, rating_count = 53, verified = true where slug = 'patricia-luna-seguros';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Rumbo Consultores', 'rumbo-consultores', 'Consultoría · procesos y finanzas', 'Diagnóstico operativo, mejora de procesos, costos y tableros de indicadores para micro y pequeñas empresas.',
   (select id from public.categories where slug = 'consultoria'),
   (select id from public.zones where slug = 'centro-sur'),
   '5214420000112', '5214420000112', 'Av. Constituyentes 812',
   extensions.st_setsrid(extensions.st_makepoint(-100.3245, 20.5992), 4326)::extensions.geography,
   true, true, true, 'plata', 'activo', true, null,
-  'Consultoría para PyMEs', array['Mejora de procesos', 'Finanzas para PyME']::text[], 12, null, 'Ingeniería Industrial · Lean Six Sigma Black Belt', array['Español', 'Inglés']::text[], array['domicilio', 'en_linea']::text[], 0, 'Responde el mismo día', null, false, null, null, null
+  'Consultoría para PyMEs', array['Mejora de procesos', 'Finanzas para PyME']::text[], 12, null, 'Ingeniería Industrial · Lean Six Sigma Black Belt', array['Español', 'Inglés']::text[], array['domicilio', 'en_linea']::text[], 0, 'Responde el mismo día', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'rumbo-consultores');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'rumbo-consultores'), 'reservar') on conflict do nothing;
@@ -340,14 +340,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.9, rating_count = 38, verified = true where slug = 'rumbo-consultores';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Plomería Hernández', 'plomeria-hernandez', 'Plomero · servicio el mismo día', 'Fugas, instalaciones, calentadores y destapes. La visita de diagnóstico se descuenta si hacemos el trabajo.',
   (select id from public.categories where slug = 'plomeria'),
   (select id from public.zones where slug = 'queretaro'),
   '5214420000113', '5214420000113', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3272, 20.5998), 4326)::extensions.geography,
   true, true, true, 'plata', 'activo', true, null,
-  'Plomero', array['Fugas de agua', 'Calentadores', 'Destapes y drenaje', 'Tinacos y cisternas']::text[], 20, 'Certificación CONOCER en instalaciones hidráulicas', null, array['Español']::text[], array['domicilio']::text[], 250, 'Llega el mismo día', 'Atiende en todo Querétaro. Taller en Calle Bambú 12, junto a la tienda Don Beto.', true, 'Garantía de 3 meses por escrito', null, null
+  'Plomero', array['Fugas de agua', 'Calentadores', 'Destapes y drenaje', 'Tinacos y cisternas']::text[], 20, 'Certificación CONOCER en instalaciones hidráulicas', null, array['Español']::text[], array['domicilio']::text[], 250, 'Llega el mismo día', 'Atiende en todo Querétaro. Taller en Calle Bambú 12, junto a la tienda Don Beto.', true, 'Garantía de 3 meses por escrito', 'Banorte · CLABE 072 680 0098 7654 3210 · a nombre de José Hernández Ruiz', null, null
 where not exists (select 1 from public.businesses where slug = 'plomeria-hernandez');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'plomeria-hernandez'), 'reservar') on conflict do nothing;
@@ -372,14 +372,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.8, rating_count = 156, verified = true where slug = 'plomeria-hernandez';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Eléctrica Ramírez', 'electrica-ramirez', 'Electricista · urgencias y paneles solares', 'Cortos, instalaciones nuevas, contactos y paneles solares con trámite ante CFE.',
   (select id from public.categories where slug = 'electricidad'),
   (select id from public.zones where slug = 'queretaro'),
   '5214420000114', '5214420000114', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3298, 20.6045), 4326)::extensions.geography,
   true, true, true, 'plata', 'activo', true, null,
-  'Electricista', array['Cortos y fallas', 'Instalaciones eléctricas', 'Paneles solares']::text[], 16, 'Técnico electricista certificado por CFE', null, array['Español']::text[], array['domicilio']::text[], 300, 'Urgencias en 2 h', null, true, 'Garantía de 6 meses en instalaciones', null, null
+  'Electricista', array['Cortos y fallas', 'Instalaciones eléctricas', 'Paneles solares']::text[], 16, 'Técnico electricista certificado por CFE', null, array['Español']::text[], array['domicilio']::text[], 300, 'Urgencias en 2 h', null, true, 'Garantía de 6 meses en instalaciones', null, null, null
 where not exists (select 1 from public.businesses where slug = 'electrica-ramirez');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'electrica-ramirez'), 'reservar') on conflict do nothing;
@@ -399,14 +399,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.9, rating_count = 88, verified = true where slug = 'electrica-ramirez';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Carpintería Don Chuy', 'carpinteria-don-chuy', 'Carpintero · cocinas y closets', 'Cocinas integrales, closets y muebles a medida en madera y MDF. Medición sin costo.',
   (select id from public.categories where slug = 'carpinteria'),
   (select id from public.zones where slug = 'el-marques'),
   '5214420000115', '5214420000115', 'Calle Bambú 33 (taller)',
   extensions.st_setsrid(extensions.st_makepoint(-100.3289, 20.6066), 4326)::extensions.geography,
   true, true, true, 'plata', 'activo', false, null,
-  'Carpintero', array['Muebles a medida', 'Closets y cocinas', 'Reparación de muebles']::text[], 30, null, null, array['Español']::text[], array['domicilio', 'despacho']::text[], 0, 'Responde en menos de 1 día', 'Taller con portón verde, a un lado de la papelería.', false, 'Garantía de 1 año en herrajes', null, null
+  'Carpintero', array['Muebles a medida', 'Closets y cocinas', 'Reparación de muebles']::text[], 30, null, null, array['Español']::text[], array['domicilio', 'despacho']::text[], 0, 'Responde en menos de 1 día', 'Taller con portón verde, a un lado de la papelería.', false, 'Garantía de 1 año en herrajes', null, null, null
 where not exists (select 1 from public.businesses where slug = 'carpinteria-don-chuy');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'carpinteria-don-chuy'), 'reservar') on conflict do nothing;
@@ -428,14 +428,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.7, rating_count = 61, verified = false where slug = 'carpinteria-don-chuy';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Climas del Bajío', 'climas-del-bajio', 'Técnico · minisplits y refrigeradores', 'Instalación, mantenimiento y reparación de minisplits, refrigeradores y lavadoras de todas las marcas.',
   (select id from public.categories where slug = 'climas'),
   (select id from public.zones where slug = 'queretaro'),
   '5214420000116', '5214420000116', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3268, 20.5975), 4326)::extensions.geography,
   true, true, true, 'plata', 'activo', true, null,
-  'Técnico en refrigeración', array['Minisplits', 'Refrigeradores', 'Lavadoras y secadoras']::text[], 9, 'Certificación en refrigeración y aire acondicionado', null, array['Español']::text[], array['domicilio']::text[], 350, 'Responde en menos de 2 h', null, false, 'Garantía de 3 meses en reparaciones', null, null
+  'Técnico en refrigeración', array['Minisplits', 'Refrigeradores', 'Lavadoras y secadoras']::text[], 9, 'Certificación en refrigeración y aire acondicionado', null, array['Español']::text[], array['domicilio']::text[], 350, 'Responde en menos de 2 h', null, false, 'Garantía de 3 meses en reparaciones', null, null, null
 where not exists (select 1 from public.businesses where slug = 'climas-del-bajio');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'climas-del-bajio'), 'reservar') on conflict do nothing;
@@ -453,14 +453,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.6, rating_count = 42, verified = true where slug = 'climas-del-bajio';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Acabados Mendoza', 'acabados-mendoza', 'Pintura e impermeabilización', 'Pintura interior y exterior, impermeabilización con garantía por escrito y trabajos de albañilería.',
   (select id from public.categories where slug = 'pintura-y-albanileria'),
   (select id from public.zones where slug = 'queretaro'),
   '5214420000117', '5214420000117', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3225, 20.6028), 4326)::extensions.geography,
   true, true, true, 'plata', 'activo', false, null,
-  'Maestro de obra', array['Pintura', 'Impermeabilización', 'Albañilería']::text[], 22, null, null, array['Español']::text[], array['domicilio']::text[], 0, 'Cotiza en 24 h', null, false, 'Garantía de 5 años en impermeabilización', null, null
+  'Maestro de obra', array['Pintura', 'Impermeabilización', 'Albañilería']::text[], 22, null, null, array['Español']::text[], array['domicilio']::text[], 0, 'Cotiza en 24 h', null, false, 'Garantía de 5 años en impermeabilización', null, null, null
 where not exists (select 1 from public.businesses where slug = 'acabados-mendoza');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'acabados-mendoza'), 'cotizar') on conflict do nothing;
@@ -477,14 +477,14 @@ insert into public.reviews (business_id, author_name, rating, body, reply, creat
 update public.businesses set rating_avg = 4.5, rating_count = 37, verified = false where slug = 'acabados-mendoza';
 
 insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,
-  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, logo_url, cover_url)
+  profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time, directions, urgent24, warranty, payment_info, logo_url, cover_url)
 select 'Cerrajería Llave Maestra', 'cerrajeria-llave-maestra', 'Cerrajero · 24 horas', 'Aperturas sin daño, cambio de chapas y duplicado de llaves de auto con chip. Servicio 24 horas.',
   (select id from public.categories where slug = 'cerrajeria'),
   (select id from public.zones where slug = 'queretaro'),
   '5214420000118', '5214420000118', 'Av. 5 de Febrero 1500',
   extensions.st_setsrid(extensions.st_makepoint(-100.3338, 20.6052), 4326)::extensions.geography,
   true, true, true, 'plata', 'activo', true, null,
-  'Cerrajero', array['Aperturas', 'Cambio de chapas', 'Llaves de auto']::text[], 13, null, null, array['Español']::text[], array['domicilio', 'despacho']::text[], 350, 'Llega en 40 min', 'Local con letrero amarillo, esquina con Av. Universidad.', true, 'Garantía de 1 año en chapas', null, null
+  'Cerrajero', array['Aperturas', 'Cambio de chapas', 'Llaves de auto']::text[], 13, null, null, array['Español']::text[], array['domicilio', 'despacho']::text[], 350, 'Llega en 40 min', 'Local con letrero amarillo, esquina con Av. Universidad.', true, 'Garantía de 1 año en chapas', null, null, null
 where not exists (select 1 from public.businesses where slug = 'cerrajeria-llave-maestra');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'cerrajeria-llave-maestra'), 'reservar') on conflict do nothing;

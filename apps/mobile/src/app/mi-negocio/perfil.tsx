@@ -95,6 +95,7 @@ function Editor() {
   const [references, setReferences] = useState(myBusiness.references ?? '');
   const [urgent24, setUrgent24] = useState(Boolean(myBusiness.urgent24));
   const [warranty, setWarranty] = useState(myBusiness.warranty ?? '');
+  const [paymentInfo, setPaymentInfo] = useState(myBusiness.paymentInfo ?? '');
 
   const cat = categoryBySlug(categorySlug);
   const extra = specialties.filter((s) => !cat?.specialties.some((x) => x.name === s));
@@ -123,6 +124,7 @@ function Editor() {
     references: references.trim() || undefined,
     urgent24,
     warranty: warranty.trim() || undefined,
+    paymentInfo: paymentInfo.trim() || undefined,
   };
   const preview: Business = { ...myBusiness, ...patch };
   const valid = patch.name.length > 2 && patch.profession.length > 2 && specialties.length > 0 && attends.length > 0;
@@ -413,6 +415,16 @@ function Editor() {
             }}
             placeholder="Garantía de 3 meses por escrito"
           />
+          <Field
+            label="Datos para que te paguen por transferencia (opcional)"
+            value={paymentInfo}
+            onChangeText={(t) => {
+              setPaymentInfo(t);
+              touch();
+            }}
+            placeholder="Banco · CLABE de 18 dígitos · a nombre de quién"
+          />
+          <Text style={styles.hint}>No se muestran en tu perfil: solo se mandan al cliente que te contrata o cuando tú pides un pago.</Text>
           <Field
             label="WhatsApp"
             value={phone}

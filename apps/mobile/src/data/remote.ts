@@ -33,6 +33,7 @@ type Row = {
   directions: string | null;
   urgent24: boolean | null;
   warranty: string | null;
+  payment_info: string | null;
   logo_url: string | null;
   cover_url: string | null;
   available: boolean | null;
@@ -62,7 +63,7 @@ const SELECT = `
   id, slug, name, subtitle, description, address, phone, whatsapp, is_open, delivers, verified, promo,
   rating_avg, rating_count, lat, lng,
   profession, specialties, years_exp, license, education, languages, attends, consult_price, response_time,
-  directions, urgent24, warranty, logo_url, cover_url, available,
+  directions, urgent24, warranty, payment_info, logo_url, cover_url, available,
   business_photos ( id, url, caption, color, position ),
   categories ( slug ),
   zones ( name ),
@@ -132,6 +133,7 @@ function toBusiness(r: Row): Business {
     references: r.directions ?? undefined,
     urgent24: Boolean(r.urgent24),
     warranty: r.warranty ?? undefined,
+    paymentInfo: r.payment_info ?? undefined,
     photo: r.logo_url ?? undefined,
     cover: r.cover_url ?? undefined,
     gallery: [...(r.business_photos ?? [])]
@@ -399,6 +401,12 @@ export const remote = {
     const { error } = await supabase.from('reviews').insert({ business_id: business.id, author_id: uid, rating, body });
     warn('reseña', error);
   },
+  async sale(business: Business, s: { amount: number; method: PaymentMethod; customerPhone?: string; customerName?: string; concept?: string }) {
+    if (!supabase || !isUuid(business.id)) return;
+    const note = [s.customerName, s.concept].filter(Boolean).join(' · ') || null;
+    const { error } = await supabase.from('sales').insert({ business_id: business.id, amount: s.amount, payment_method: s.method, customer_phone: s.customerPhone ?? null, note });
+    warn('cobro', error);
+  },
   async replyReview(reviewId: string, reply: string) {
     if (!supabase || !isUuid(reviewId)) return;
     const { error } = await supabase.from('reviews').update({ reply, replied_at: new Date().toISOString() }).eq('id', reviewId);
@@ -500,7 +508,7 @@ export async function saveBusiness(current: Business, patch: Partial<Business>, 
     phone: next.phone, whatsapp: next.phone, address: next.address, profession: next.profession, specialties: next.specialties,
     years_exp: next.yearsExp || 0, license: next.license ?? null, education: next.education ?? null, languages: next.languages, attends: next.attends,
     consult_price: next.consultPrice ?? null, response_time: next.responseTime ?? null, directions: next.references ?? null,
-    urgent24: Boolean(next.urgent24), warranty: next.warranty ?? null,
+    urgent24: Boolean(next.urgent24), warranty: next.warranty ?? null, payment_info: next.paymentInfo ?? null,
   };
 
   let id = current.id;

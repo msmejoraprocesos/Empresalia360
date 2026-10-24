@@ -65,6 +65,8 @@ export type Post = {
 
 export type IncomingRequest = {
   id: string;
+  /** Foto que mandó el cliente con su solicitud */
+  photo?: string;
   customerPhone?: string;
   type: 'cita' | 'cotizacion' | 'contratacion';
   /** Monto ya pagado o por cobrar en contrataciones */
@@ -149,6 +151,8 @@ export type Business = {
   urgent24?: boolean;
   /** Garantía por escrito del trabajo (oficios) */
   warranty?: string;
+  /** Datos para que le paguen por transferencia: banco, CLABE y titular. Solo se mandan al cliente que contrata. */
+  paymentInfo?: string;
   modules: Module[];
   delivers: boolean;
   verified: boolean;
@@ -196,5 +200,7 @@ export type Sale = {
   method: PaymentMethod;
   customerPhone?: string;
   customerName?: string;
+  /** Por qué servicio fue el pago */
+  concept?: string;
   createdAt: number;
 };

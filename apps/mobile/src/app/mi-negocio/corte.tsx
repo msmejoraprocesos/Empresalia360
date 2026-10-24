@@ -1,6 +1,7 @@
+import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Card, Header, IconCircle } from '@/components/ui';
+import { Button, Card, EmptyState, Header, IconCircle } from '@/components/ui';
 import { Brand } from '@/constants/theme';
 import type { IconName, PaymentMethod } from '@/data/types';
 import { money } from '@/lib/format';
@@ -19,23 +20,26 @@ function time(t: number) {
 }
 
 export default function Corte() {
+  const router = useRouter();
   const { state } = useApp();
   const total = state.sales.reduce((a, s) => a + s.amount, 0);
-  const methods = (Object.keys(M) as PaymentMethod[]).map((m) => ({ m, sum: state.sales.filter((s) => s.method === m).reduce((a, s) => a + s.amount, 0) }));
-  const identified = state.sales.filter((s) => s.customerPhone || s.customerName).length;
+  // Solo se muestran las formas de pago que sí se usaron
+  const methods = (Object.keys(M) as PaymentMethod[])
+    .map((m) => ({ m, sum: state.sales.filter((s) => s.method === m).reduce((a, s) => a + s.amount, 0) }))
+    .filter((x) => x.sum > 0);
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
-      <Header title="Corte de caja" subtitle="Hoy" color={Brand.ink} />
+      <Header title="Resumen de cobros" subtitle="Lo que has anotado en Cobrar" color={Brand.ink} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
         <Card style={{ alignItems: 'center' }}>
-          <Text style={styles.sub}>Total del día</Text>
+          <Text style={styles.sub}>Total cobrado</Text>
           <Text style={styles.big}>{money(total)}</Text>
-          <Text style={styles.sub}>
-            {state.sales.length} cobros · {identified} con cliente identificado
-          </Text>
+          <Text style={styles.sub}>{state.sales.length === 1 ? '1 pago' : `${state.sales.length} pagos`}</Text>
         </Card>
-        <Card style={{ gap: 12 }}>
+        <Button label="Anotar un pago" icon="add" onPress={() => router.push('/panel/cobrar')} />
+        {state.sales.length === 0 ? <EmptyState icon="wallet-outline" title="Aún no anotas pagos" text="Cuando un cliente te pague, anótalo en Cobrar y aquí verás cuánto llevas." /> : null}
+        {methods.length ? <Card style={{ gap: 12 }}>
           {methods.map(({ m, sum }) => (
             <View key={m} style={{ gap: 6 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -47,15 +51,15 @@ export default function Corte() {
               </View>
             </View>
           ))}
-        </Card>
-        <Text style={styles.label}>Movimientos</Text>
+        </Card> : null}
+        {state.sales.length ? <Text style={styles.label}>Pagos</Text> : null}
         {state.sales.map((s) => (
           <Card key={s.id} style={styles.row}>
             <IconCircle icon={M[s.method].icon} color={M[s.method].color} size={40} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{s.customerName ?? 'Cliente de mostrador'}</Text>
+              <Text style={styles.name}>{s.customerName ?? 'Cliente'}</Text>
               <Text style={styles.sub}>
-                {M[s.method].label} · {time(s.createdAt)}
+                {[s.concept, M[s.method].label, `${new Date(s.createdAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} ${time(s.createdAt)}`].filter(Boolean).join(' · ')}
               </Text>
             </View>
             <Text style={styles.name}>{money(s.amount)}</Text>

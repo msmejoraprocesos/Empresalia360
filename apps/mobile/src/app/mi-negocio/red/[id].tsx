@@ -53,7 +53,7 @@ export default function Respuestas() {
                   <Text style={{ color: Brand.ink }}>Marca {o.brand} · en existencia</Text>
                   <Text style={styles.price}>{money(o.price ?? 0)}</Text>
                 </View>
-                <Text style={styles.sub}>Lista en {o.readyIn}</Text>
+                <Text style={styles.sub}>Entrega en {o.readyIn}</Text>
               </Card>
             </Pressable>
           );

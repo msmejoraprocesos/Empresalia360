@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PhotoPicker } from '@/components/photo-picker';
 import { Button, Card, Chip, Field, Header, IconCircle, OptionPill } from '@/components/ui';
 import { Brand, Radius, Shadow } from '@/constants/theme';
 import { useApp } from '@/store/app';
@@ -11,6 +12,7 @@ export default function Red() {
   const { state, actions } = useApp();
   const [creating, setCreating] = useState(false);
   const [part, setPart] = useState('');
+  const [doc, setDoc] = useState<string>();
   const [vehicle, setVehicle] = useState('');
   const [qty, setQty] = useState('1');
   const [urgent, setUrgent] = useState(true);
@@ -39,7 +41,7 @@ export default function Red() {
               </View>
             </View>
             <Field label="Para el cliente (opcional)" value={forCustomer} onChangeText={setForCustomer} placeholder="Nombre del cliente o número de presupuesto" />
-            <Button label="Adjuntar documento" variant="ghost" icon="camera-outline" small />
+            <PhotoPicker label="Documento (opcional)" value={doc} onChange={setDoc} hint="Toma foto del documento o elígelo de tu galería" />
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Button label="Cancelar" variant="ghost" style={{ flex: 1 }} onPress={() => setCreating(false)} />
               <Button

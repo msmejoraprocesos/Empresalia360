@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Header, IconCircle } from '@/components/ui';
@@ -14,6 +15,7 @@ const CUSTOMERS = [
 ];
 
 export default function Clientes() {
+  const router = useRouter();
   const { state } = useApp();
   const goal = myBusiness.loyalty?.goal ?? 10;
   const inactive = CUSTOMERS.filter((c) => c.last.includes('34'));
@@ -41,7 +43,7 @@ export default function Clientes() {
         {inactive.length ? (
           <Card style={{ gap: 10, backgroundColor: Brand.mangoSoft }}>
             <Text style={{ fontWeight: '800', color: '#5A3E00' }}>{inactive.length} cliente no ha vuelto en 30 días</Text>
-            <Button label="Mandarle una promoción" variant="dark" small />
+            <Button label="Mandarle una promoción" variant="dark" small onPress={() => router.push('/mi-negocio/promocion-nueva?para=inactivos')} />
           </Card>
         ) : null}
         <Text style={styles.label}>Clientes frecuentes</Text>

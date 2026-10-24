@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Header, ListRow } from '@/components/ui';
 import { Brand, TabBarSpace } from '@/constants/theme';
+import { signOut } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { myBusiness, useApp } from '@/store/app';
 
@@ -49,7 +50,7 @@ export default function Mas() {
           <ListRow icon="pricetag-outline" iconBg={Brand.mangoSoft} iconColor="#7A5600" title="Promociones" subtitle={`${state.myPromotions.filter((p) => p.active).length} activas`} onPress={() => router.push('/mi-negocio/promociones')} />
           <ListRow icon="megaphone-outline" iconBg={Brand.mangoSoft} iconColor="#7A5600" title="Publicar en la comunidad" subtitle="Anuncia un servicio, un consejo o un evento" onPress={() => router.push('/mi-negocio/publicar')} />
           <ListRow icon="trophy-outline" iconBg={Brand.chileSoft} iconColor={Brand.chileDark} title="Espacios destacados" subtitle="Aparece primero en tu especialidad" onPress={() => router.push('/mi-negocio/espacios')} />
-          <ListRow icon="globe-outline" iconBg={Brand.jacarandaSoft} iconColor={Brand.jacaranda} title="Mi página y QR" subtitle={`expertalia360.mx/${myBusiness.slug}`} onPress={() => router.push(`/n/${myBusiness.slug}`)} last />
+          <ListRow icon="globe-outline" iconBg={Brand.jacarandaSoft} iconColor={Brand.jacaranda} title="Mi QR y liga" subtitle="Para tarjetas, tu despacho y pedir reseñas" onPress={() => router.push('/qr')} last />
         </Card>
 
         <Text style={styles.section}>Red de expertos</Text>
@@ -68,10 +69,12 @@ export default function Mas() {
               router.replace('/cliente');
             }}
           />
+          <ListRow icon="chatbubble-ellipses-outline" title="Ayuda y soporte" onPress={() => router.push('/ayuda')} />
           <ListRow
             icon="log-out-outline"
             title="Cerrar sesión"
             onPress={() => {
+              void signOut();
               actions.setRole(null);
               router.replace('/bienvenida');
             }}
