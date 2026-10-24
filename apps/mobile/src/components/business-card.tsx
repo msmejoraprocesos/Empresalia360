@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -17,7 +18,11 @@ export function ProAvatar({ business, size = 60 }: { business: Business; size?: 
   const bg = cat?.color === Brand.line ? Brand.inkSoft : cat?.color ?? Brand.chile;
   return (
     <View style={{ width: size, height: size, borderRadius: size * 0.32, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: cat?.ink === Brand.mango ? Brand.mango : Brand.white, fontWeight: '800', fontSize: size * 0.36 }}>{initials(business.name).toUpperCase()}</Text>
+      {business.photo ? (
+        <Image source={{ uri: business.photo }} style={{ width: size, height: size, borderRadius: size * 0.32 }} contentFit="cover" accessibilityLabel={`Foto de ${business.name}`} />
+      ) : (
+        <Text style={{ color: cat?.ink === Brand.mango ? Brand.mango : Brand.white, fontWeight: '800', fontSize: size * 0.36 }}>{initials(business.name).toUpperCase()}</Text>
+      )}
       {business.verified ? (
         <View style={[styles.badge, { width: size * 0.36, height: size * 0.36, borderRadius: size * 0.18 }]}>
           <Ionicons name="checkmark" size={size * 0.22} color={Brand.white} />
@@ -97,6 +102,12 @@ export function BusinessCard({
         </View>
         {sponsored ? <Chip label="Destacado" color={Brand.mangoSoft} ink="#5A3E00" /> : consult ? <Text style={styles.consult}>{consult}</Text> : null}
       </View>
+      {business.urgent24 || business.promo ? (
+        <View style={styles.chips}>
+          {business.urgent24 ? <Chip label="Urgencias 24 h" color="#FDE2E2" ink="#A32020" icon="flash" /> : null}
+          {business.promo ? <Chip label={business.promo} color={Brand.chileSoft} ink={Brand.chileDark} icon="pricetag" /> : null}
+        </View>
+      ) : null}
     </Pressable>
   );
 }

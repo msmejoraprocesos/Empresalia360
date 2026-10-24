@@ -4,7 +4,7 @@
  */
 import { Brand } from '../constants/brand';
 
-import type { Business, Category, IncomingRequest, Order, Post, Promotion, Review } from './types';
+import type { Business, Category, IncomingRequest, Order, Post, Promotion, Question, Review } from './types';
 
 export const ZONE = { name: 'Querétaro Centro', municipality: 'Querétaro', lat: 20.6015, lng: -100.329 };
 
@@ -825,7 +825,41 @@ export const POSTS: Post[] = [
   },
 ];
 
-export const PROMOTIONS: Promotion[] = [];
+export const PROMOTIONS: Promotion[] = [
+  { id: 'p1', kind: 'negocio', badge: '$350', title: 'Primera consulta en línea', subtitle: 'Lic. Mariana Ortiz · derecho familiar', businessSlug: 'lic-mariana-ortiz' },
+  { id: 'p2', kind: 'global', badge: '−15%', title: 'Temporada de declaraciones', subtitle: 'Con contadores de Expertalia 360' },
+  { id: 'p3', kind: 'vence', badge: 'Gratis', title: 'Revisión de pólizas', subtitle: 'Patricia Luna · vence el domingo', businessSlug: 'patricia-luna-seguros' },
+  { id: 'p4', kind: 'negocio', badge: '−20%', title: 'Mantenimiento de minisplit', subtitle: 'Climas del Bajío · antes del calor', businessSlug: 'climas-del-bajio' },
+  { id: 'p5', kind: 'cumpleanos', badge: '−20%', title: 'Tu regalo de cumpleaños', subtitle: 'Psic. Andrea Vidal', businessSlug: 'psic-andrea-vidal' },
+];
+
+/** Preguntas que los clientes hacen a la comunidad y responden los expertos. */
+export const QUESTIONS: Question[] = [
+  {
+    id: 'qa1', author: 'Laura M.', categorySlug: 'abogados', specialty: 'Laboral', dateLabel: 'hace 3 h',
+    body: 'Me ofrecen firmar mi renuncia a cambio de un mes de sueldo. ¿Me conviene o me corresponde más?',
+    answers: [
+      { businessSlug: 'lic-roberto-campos', body: 'Si te están pidiendo renunciar, en realidad es un despido. Te corresponden 3 meses de salario, 20 días por año en algunos casos, más aguinaldo, vacaciones y prima proporcionales. No firmes sin revisar los números.', helpful: 24 },
+    ],
+  },
+  {
+    id: 'qa2', author: 'Pedro S.', categorySlug: 'contadores', specialty: 'Declaración anual', dateLabel: 'ayer',
+    body: '¿Tengo que presentar declaración anual si solo tuve un trabajo de sueldo?',
+    answers: [
+      { businessSlug: 'despacho-contable-reyes', body: 'Si ganaste menos de 400 mil pesos y solo de un patrón, no es obligatoria. Pero si tuviste gastos médicos o colegiaturas, conviene presentarla para recuperar saldo a favor.', helpful: 31 },
+      { businessSlug: 'cp-laura-mendez', body: 'Coincido. Revisa también si tu patrón te hizo el ajuste anual; si no, podrías tener saldo a favor.', helpful: 9 },
+    ],
+  },
+  {
+    id: 'qa3', author: 'Sofía N.', categorySlug: 'plomeria', specialty: 'Calentadores', dateLabel: 'hace 2 días',
+    body: 'Mi calentador de paso enciende y se apaga solo. ¿Es peligroso?',
+    answers: [{ businessSlug: 'plomeria-hernandez', body: 'Puede ser poca presión de agua o el sensor de flama sucio. No es peligroso si no huele a gas; si huele, cierra la llave y ventila. Es una reparación sencilla.', helpful: 15 }],
+  },
+  {
+    id: 'qa4', author: 'Usuario 3381', categorySlug: 'arquitectura', dateLabel: 'hace 4 días',
+    body: '¿Necesito licencia para construir un segundo piso en mi casa?', answers: [],
+  },
+];
 
 const H = 3600 * 1000;
 
@@ -871,6 +905,107 @@ export const INCOMING_REQUESTS: IncomingRequest[] = [
   { id: 'rq3', type: 'cotizacion', customer: 'Lucía P.', specialty: 'Familiar', detail: 'Divorcio voluntario, sin hijos, con un departamento en común', when: 'Recibida ayer', attend: 'despacho', status: 'cotizada', quotedPrice: 14000 },
   { id: 'rq4', type: 'cita', customer: 'Pedro S.', specialty: 'Civil e inmobiliario', detail: 'Testamento · revisión de documentos', when: 'Jue 11:30', attend: 'despacho', status: 'aceptada' },
 ];
+
+// ─────────────────────────────────────────────────────────────
+// Detalles de perfil: referencias para llegar, galería, urgencias,
+// garantía, paquetes con precio fijo y tarjetas de lealtad
+// ─────────────────────────────────────────────────────────────
+const EXTRA: Record<string, Partial<Business>> = {
+  'lic-mariana-ortiz': {
+    references: 'Plaza Zen, planta alta, local 8. Frente al Oxxo; hay estacionamiento de la plaza.',
+    gallery: [
+      { id: 'g1', caption: 'Sala de juntas del despacho', color: '#DCE4F2' },
+      { id: 'g2', caption: 'Recepción', color: '#E9E2FA' },
+    ],
+    loyalty: { kind: 'sellos', goal: 5, reward: 'Quinta consulta sin costo' },
+  },
+  'despacho-contable-reyes': {
+    references: 'Edificio gris de 4 pisos, piso 3. Entrada por Zaragoza, a media cuadra del jardín.',
+    gallery: [
+      { id: 'g1', caption: 'Despacho', color: '#DDF1EA' },
+      { id: 'g2', caption: 'Área de atención', color: '#E1E8F4' },
+    ],
+    loyalty: { kind: 'sellos', goal: 12, reward: 'Un mes de contabilidad gratis' },
+  },
+  'plomeria-hernandez': {
+    references: 'Atiende en todo Querétaro. Taller en Calle Bambú 12, junto a la tienda Don Beto.',
+    urgent24: true,
+    warranty: 'Garantía de 3 meses por escrito',
+    gallery: [
+      { id: 'g1', caption: 'Cambio de calentador de paso', color: '#DFEBFD' },
+      { id: 'g2', caption: 'Reparación de fuga en muro (antes y después)', color: '#E1E8F4' },
+      { id: 'g3', caption: 'Instalación de tinaco de 1,100 L', color: '#DCE4F2' },
+    ],
+    loyalty: { kind: 'sellos', goal: 4, reward: 'Cuarta visita sin costo de diagnóstico' },
+  },
+  'electrica-ramirez': {
+    urgent24: true,
+    warranty: 'Garantía de 6 meses en instalaciones',
+    gallery: [
+      { id: 'g1', caption: 'Sistema de 6 paneles solares', color: '#FBF0D9' },
+      { id: 'g2', caption: 'Tablero eléctrico nuevo', color: '#E2E7EF' },
+    ],
+  },
+  'cerrajeria-llave-maestra': {
+    urgent24: true,
+    references: 'Local con letrero amarillo, esquina con Av. Universidad.',
+    warranty: 'Garantía de 1 año en chapas',
+  },
+  'carpinteria-don-chuy': {
+    warranty: 'Garantía de 1 año en herrajes',
+    references: 'Taller con portón verde, a un lado de la papelería.',
+    gallery: [
+      { id: 'g1', caption: 'Cocina integral en roble', color: '#F1E4D6' },
+      { id: 'g2', caption: 'Closet de piso a techo', color: '#EADBC8' },
+      { id: 'g3', caption: 'Librero empotrado', color: '#F3E9DC' },
+    ],
+  },
+  'acabados-mendoza': {
+    warranty: 'Garantía de 5 años en impermeabilización',
+    gallery: [{ id: 'g1', caption: 'Azotea impermeabilizada, 120 m²', color: '#DDF1EA' }],
+  },
+  'climas-del-bajio': { warranty: 'Garantía de 3 meses en reparaciones' },
+  'psic-andrea-vidal': {
+    references: 'Consultorio 2, planta baja. Timbre con el nombre "Vidal".',
+    gallery: [{ id: 'g1', caption: 'Consultorio', color: '#F8E1EB' }],
+  },
+  'notaria-publica-14': { references: 'Casona amarilla frente a la Facultad de Derecho. Estacionamiento en la parte trasera.' },
+  'arq-diego-fuentes': {
+    gallery: [
+      { id: 'g1', caption: 'Remodelación de cocina, Juriquilla', color: '#E2E7EF' },
+      { id: 'g2', caption: 'Casa habitación, El Marqués', color: '#DCE4F2' },
+    ],
+  },
+};
+
+/** Paquetes con precio fijo que el cliente puede contratar y pagar en la app. */
+const PACKAGES: Record<string, Business['items']> = {
+  'despacho-contable-reyes': [
+    { id: 'pk1', kind: 'producto', section: 'Paquetes', name: 'Declaración anual persona física', description: 'Sueldos, honorarios o arrendamiento', price: 1200, available: true },
+    { id: 'pk2', kind: 'producto', section: 'Paquetes', name: 'Declaración mensual RESICO', description: 'Incluye revisión de facturas', price: 650, available: true },
+    { id: 'pk3', kind: 'producto', section: 'Trámites', name: 'Alta en el SAT y e.firma', description: 'Te acompañamos a la cita', price: 900, available: true },
+  ],
+  'cp-laura-mendez': [
+    { id: 'pk4', kind: 'producto', section: 'Paquetes', name: 'Plan freelancer mensual', description: 'Declaración y facturación ilimitada', price: 590, available: true },
+    { id: 'pk5', kind: 'producto', section: 'Paquetes', name: 'Declaración anual', description: 'Persona física', price: 950, available: true },
+  ],
+  'traducciones-peritas-morales': [
+    { id: 'pk6', kind: 'producto', section: 'Certificadas', name: 'Acta de nacimiento', description: 'Inglés o francés · 48 h', price: 450, available: true },
+    { id: 'pk7', kind: 'producto', section: 'Certificadas', name: 'Título profesional', price: 650, available: true },
+  ],
+  'lic-mariana-ortiz': [
+    { id: 'pk8', kind: 'producto', section: 'Paquetes', name: 'Revisión de contrato de arrendamiento', description: 'Entrega por escrito en 48 h', price: 900, available: true },
+  ],
+  'climas-del-bajio': [
+    { id: 'pk9', kind: 'producto', section: 'Paquetes', name: 'Mantenimiento de 2 minisplits', description: 'Limpieza profunda y revisión de gas', price: 1100, available: true },
+  ],
+};
+
+for (const b of BUSINESSES) {
+  Object.assign(b, EXTRA[b.slug] ?? {});
+  const extra = PACKAGES[b.slug];
+  if (extra) b.items.push(...extra);
+}
 
 export function categoryBySlug(slug: string): Category | undefined {
   return CATEGORIES.find((c) => c.slug === slug);

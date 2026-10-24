@@ -1,11 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { consultLabel, ProAvatar } from '@/components/business-card';
+import { BusinessMap } from '@/components/business-map';
 import { PostCard } from '@/components/community-feed';
+import { Pattern } from '@/components/pattern-background';
 import { BottomBar, Button, Card, Chip, EmptyState, IconCircle, RoundIconButton, Segmented, Stars } from '@/components/ui';
 import { Brand, Radius, ShadowStrong } from '@/constants/theme';
 import { ATTEND_ICON, ATTEND_LABEL, categoryBySlug, distanceTo, getBusiness, primaryAction } from '@/data';
@@ -38,8 +41,10 @@ export default function PerfilProfesional() {
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
+      <Pattern kind={cat?.group ?? 'profesionales'} />
       <ScrollView contentContainerStyle={{ paddingBottom: 150 }}>
         <View style={[styles.cover, { backgroundColor: coverColor, paddingTop: insets.top + 10 }]}>
+          {b.cover ? <Image source={{ uri: b.cover }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityLabel="Portada" /> : null}
           <View style={styles.coverRow}>
             <RoundIconButton icon="chevron-back" label="Volver" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -111,11 +116,14 @@ export default function PerfilProfesional() {
             ))}
           </View>
 
-          {b.verified || b.responseTime || consult ? (
+          {b.verified || b.responseTime || consult || b.urgent24 || b.warranty || b.loyalty ? (
             <View style={styles.trust}>
               {b.verified ? <Chip label={b.license ? 'Cédula verificada' : 'Identidad verificada'} color={Brand.nopalSoft} ink={Brand.nopalDark} icon="shield-checkmark" /> : null}
               {b.responseTime ? <Chip label={b.responseTime} icon="time-outline" /> : null}
               {consult ? <Chip label={consult} color={Brand.mangoSoft} ink="#5A3E00" icon="cash-outline" /> : null}
+              {b.urgent24 ? <Chip label="Urgencias 24 h" color="#FDE2E2" ink="#A32020" icon="flash" /> : null}
+              {b.warranty ? <Chip label={b.warranty} color={Brand.albercaSoft} ink="#1757B8" icon="shield-outline" /> : null}
+              {b.loyalty ? <Chip label={`Lealtad: ${b.loyalty.reward}`} color={Brand.jacarandaSoft} ink={Brand.jacaranda} icon="gift-outline" /> : null}
             </View>
           ) : null}
         </Card>
@@ -152,19 +160,63 @@ export default function PerfilProfesional() {
               {b.license ? <InfoRow icon="ribbon-outline" label="Cédula o certificación" value={b.license} /> : null}
               {b.education ? <InfoRow icon="school-outline" label="Formación" value={b.education} /> : null}
               <InfoRow icon="language-outline" label="Idiomas" value={b.languages.join(', ')} />
-              <InfoRow icon="location-outline" label="Dónde atiende" value={`${b.address}, ${b.zone}`} />
               <InfoRow icon="time-outline" label="Horario de hoy" value={b.isOpen ? `Disponible hasta las ${b.closesAt}` : 'Fuera de horario'} />
+            </Card>
+          ) : null}
+
+          {tab === 'perfil' && b.gallery?.length ? (
+            <Card style={{ gap: 10 }}>
+              <Text style={styles.h}>{b.attends.includes('domicilio') && !b.attends.includes('despacho') ? 'Trabajos realizados' : 'Fotos'}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                {b.gallery.map((g) => (
+                  <View key={g.id} style={{ width: 170, gap: 6 }}>
+                    {g.uri ? (
+                      <Image source={{ uri: g.uri }} style={styles.galleryImg} contentFit="cover" accessibilityLabel={g.caption} />
+                    ) : (
+                      <View style={[styles.galleryImg, { backgroundColor: g.color ?? Brand.line, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Ionicons name="image-outline" size={28} color="rgba(18,26,43,0.35)" />
+                      </View>
+                    )}
+                    <Text style={styles.galleryCaption} numberOfLines={2}>
+                      {g.caption}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </Card>
+          ) : null}
+
+          {tab === 'perfil' ? (
+            <Card style={{ gap: 12 }}>
+              <Text style={styles.h}>Ubicación</Text>
+              <View style={styles.miniMap}>
+                <BusinessMap businesses={[b]} selected={b.slug} onSelect={() => undefined} still focus />
+              </View>
+              <InfoRow icon="location-outline" label="Dirección" value={`${b.address}, ${b.zone}`} />
+              {b.references ? <InfoRow icon="navigate-outline" label="Referencias para llegar" value={b.references} /> : null}
+              <InfoRow icon="walk-outline" label="Distancia" value={`${distance(distanceTo(b))} de ti`} />
               <Button
-                label="Ver en el mapa"
+                label="Abrir en el mapa"
                 variant="ghost"
-                icon="navigate-outline"
+                icon="map-outline"
                 small
                 onPress={() => {
                   track(b, 'como_llegar');
-                  router.push('/mapa');
+                  router.push(`/mapa?slug=${b.slug}`);
                 }}
               />
             </Card>
+          ) : null}
+
+          {tab === 'servicios' && b.items.some((i) => i.kind === 'producto') ? (
+            <Pressable onPress={() => router.push(`/negocio/${b.slug}/contratar`)} accessibilityRole="button" style={styles.packages}>
+              <Ionicons name="card-outline" size={22} color={Brand.white} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: Brand.white, fontWeight: '800', fontSize: 15 }}>Paquetes con precio fijo</Text>
+                <Text style={{ color: '#D6E0F0', fontSize: 12 }}>Contrata y paga en la app con tarjeta, transferencia o efectivo</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Brand.white} />
+            </Pressable>
           ) : null}
 
           {tab === 'servicios' ? (
@@ -177,7 +229,12 @@ export default function PerfilProfesional() {
                       {[it.kind === 'cita' && it.durationMin ? `${it.durationMin} min` : null, it.description].filter(Boolean).join(' · ') || 'Precio según el caso'}
                     </Text>
                   </View>
-                  {it.kind === 'cotizacion' ? (
+                  {it.kind === 'producto' ? (
+                    <Pressable onPress={() => router.push(`/negocio/${b.slug}/contratar`)} accessibilityRole="button" hitSlop={8} style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.price}>{money(it.price ?? 0)}</Text>
+                      <Text style={{ color: Brand.nopalDark, fontWeight: '800', fontSize: 12 }}>Contratar</Text>
+                    </Pressable>
+                  ) : it.kind === 'cotizacion' ? (
                     <Pressable onPress={() => router.push(`/negocio/${b.slug}/cotizar?item=${it.id}`)} accessibilityRole="button" hitSlop={8}>
                       <Text style={{ color: Brand.jacaranda, fontWeight: '800' }}>Cotizar</Text>
                     </Pressable>
@@ -267,7 +324,7 @@ export default function PerfilProfesional() {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: 'ribbon-outline' | 'school-outline' | 'language-outline' | 'location-outline' | 'time-outline'; label: string; value: string }) {
+function InfoRow({ icon, label, value }: { icon: 'ribbon-outline' | 'school-outline' | 'language-outline' | 'location-outline' | 'time-outline' | 'navigate-outline' | 'walk-outline'; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
       <IconCircle icon={icon} color={Brand.chileSoft} ink={Brand.chile} size={36} square />
@@ -280,7 +337,7 @@ function InfoRow({ icon, label, value }: { icon: 'ribbon-outline' | 'school-outl
 }
 
 const styles = StyleSheet.create({
-  cover: { height: 130, paddingHorizontal: 16 },
+  cover: { height: 150, paddingHorizontal: 16, overflow: 'hidden' },
   coverRow: { flexDirection: 'row', justifyContent: 'space-between' },
   info: { marginHorizontal: 16, marginTop: -54, borderRadius: Radius.lg, gap: 14, ...ShadowStrong },
   idRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
@@ -311,6 +368,10 @@ const styles = StyleSheet.create({
   distLabel: { width: 10, fontSize: 12, color: Brand.inkSoft, fontVariant: ['tabular-nums'] },
   distTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: Brand.line, overflow: 'hidden' },
   distFill: { height: 8, borderRadius: 4, backgroundColor: '#C98A0B' },
+  galleryImg: { width: 170, height: 120, borderRadius: Radius.md },
+  galleryCaption: { fontSize: 12, color: Brand.inkSoft },
+  miniMap: { height: 170, borderRadius: Radius.md, overflow: 'hidden' },
+  packages: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Brand.nopalDark, borderRadius: Radius.lg, padding: 14 },
   reply: { backgroundColor: Brand.tortilla, borderRadius: Radius.md, padding: 10, gap: 4, marginTop: 4 },
   replyLabel: { fontSize: 12, fontWeight: '800', color: Brand.chileDark },
 });

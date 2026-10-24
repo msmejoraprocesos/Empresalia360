@@ -29,6 +29,8 @@ export default function Perfil() {
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: TabBarSpace }}>
         <Card style={{ paddingVertical: 4 }}>
+          <ListRow icon="gift-outline" iconBg={Brand.mangoSoft} iconColor="#7A5600" title="Puntos, sellos y cupones" subtitle={`${state.points.toLocaleString('es-MX')} puntos`} onPress={() => router.push('/lealtad')} />
+          <ListRow icon="qr-code-outline" title="Mi QR" subtitle="Muéstralo al pagar para sumar sellos" onPress={() => router.push('/qr')} />
           <ListRow icon="calendar-outline" iconBg={Brand.albercaSoft} iconColor="#1757B8" title="Mis citas y cotizaciones" subtitle={`${state.orders.length} en tu historial`} onPress={() => router.push('/cliente/pedidos')} />
           <ListRow icon="people-outline" iconBg={Brand.nopalSoft} iconColor={Brand.nopalDark} title="Comunidad" subtitle="Servicios, consejos y eventos" onPress={() => router.push('/cliente/comunidad')} />
           <ListRow icon="heart-outline" iconBg={Brand.bugambiliaSoft} iconColor={Brand.bugambilia} title="Expertos guardados" subtitle={favs.map((b) => b!.name).join(', ') || 'Aún no guardas a nadie'} onPress={() => router.push('/cliente/explorar')} last />

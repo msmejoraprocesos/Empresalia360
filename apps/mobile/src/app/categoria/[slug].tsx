@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BusinessCard } from '@/components/business-card';
+import { Pattern } from '@/components/pattern-background';
 import { EmptyState, Header } from '@/components/ui';
 import { Brand, Radius } from '@/constants/theme';
 import { categoryBySlug, searchProfessionals } from '@/data';
@@ -21,6 +22,7 @@ export default function Categoria() {
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
+      <Pattern kind={cat.group} />
       <Header title={cat.name} subtitle={`${searchProfessionals('', { category: cat.slug }).length} en Querétaro`} color={headerColor} />
       <ScrollView contentContainerStyle={{ paddingBottom: 40, gap: 12, paddingTop: 14 }}>
         <Text style={styles.label}>Especialidades</Text>

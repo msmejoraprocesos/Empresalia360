@@ -29,6 +29,18 @@ export type Category = {
   specialties: Specialty[];
 };
 
+export type GalleryItem = { id: string; caption: string; uri?: string; color?: string };
+
+export type Question = {
+  id: string;
+  author: string;
+  categorySlug: string;
+  specialty?: string;
+  body: string;
+  dateLabel: string;
+  answers: { businessSlug: string; body: string; helpful: number }[];
+};
+
 export type Post = {
   id: string;
   businessSlug: string;
@@ -46,7 +58,10 @@ export type Post = {
 
 export type IncomingRequest = {
   id: string;
-  type: 'cita' | 'cotizacion';
+  type: 'cita' | 'cotizacion' | 'contratacion';
+  /** Monto ya pagado o por cobrar en contrataciones */
+  amount?: number;
+  paymentMethod?: PaymentMethod;
   customer: string;
   specialty: string;
   detail: string;
@@ -115,6 +130,17 @@ export type Business = {
   /** Precio de la primera consulta o visita; 0 = sin costo */
   consultPrice?: number;
   responseTime?: string;
+  /** Foto de perfil y de portada (liga pública o foto local) */
+  photo?: string;
+  cover?: string;
+  /** Trabajos o despacho: fotos con descripción; sin foto se muestra un recuadro de color */
+  gallery?: GalleryItem[];
+  /** Cómo llegar: "Frente al parque, segundo piso, timbre 3" */
+  references?: string;
+  /** Atiende urgencias fuera de horario */
+  urgent24?: boolean;
+  /** Garantía por escrito del trabajo (oficios) */
+  warranty?: string;
   modules: Module[];
   delivers: boolean;
   verified: boolean;

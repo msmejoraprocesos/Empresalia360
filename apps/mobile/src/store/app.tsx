@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { OPENING_ADS, type OpeningAd } from '@/data/ads';
-import { BUSINESSES, INCOMING_REQUESTS, INITIAL_ORDERS, MY_BUSINESS_SLUG, POSTS } from '@/data/mock';
+import { BUSINESSES, INCOMING_REQUESTS, INITIAL_ORDERS, MY_BUSINESS_SLUG, POSTS, PROMOTIONS, QUESTIONS } from '@/data/mock';
 import { track } from '@/lib/analytics';
-import type { Business, CatalogItem, IncomingRequest, Order, PaymentMethod, Post, Review, Role, Sale } from '@/data/types';
+import type { Business, CatalogItem, IncomingRequest, Order, OrderMode, PaymentMethod, Post, Question, Review, Role, Sale } from '@/data/types';
 
 // ─────────────────────────────────────────────────────────────
 // Tipos del estado
@@ -32,6 +32,14 @@ export type AdCampaign = {
   opening?: OpeningAd;
 };
 
+export type SupplyResponse = { id: string; supplier: string; distanceKm: number; rating: number; hasIt: boolean; brand?: string; price?: number; readyIn?: string };
+/** Encargo a la red de expertos (ej. un abogado pide un perito traductor) */
+export type SupplyRequest = { id: string; part: string; vehicle: string; qty: number; urgent: boolean; forCustomer?: string; createdAt: number; sentTo: number; responses: SupplyResponse[]; chosenId?: string };
+/** Encargo que otro experto le hace a este profesional */
+export type ProviderRequest = { id: string; from: string; distanceKm: number; part: string; vehicle: string; urgent: boolean; status: 'nueva' | 'ofertada' | 'no_tengo'; offerPrice?: number; readyIn?: string };
+export type MyPromotion = { id: string; title: string; target: string; reach: number; redemptions: number; active: boolean; photo?: string };
+export type Cart = { businessSlug: string | null; mode: OrderMode; lines: Record<string, number> };
+
 export type PendingBusiness = { id: string; name: string; category: string; zone: string; owner: string };
 export type ReportedReview = { id: string; business: string; author: string; rating: number; body: string; reason: string };
 
@@ -54,22 +62,35 @@ export type ProfilePatch = Partial<
     | 'zone'
     | 'phone'
     | 'subtitle'
+    | 'photo'
+    | 'cover'
+    | 'gallery'
+    | 'references'
+    | 'urgent24'
+    | 'warranty'
   >
 >;
 
+export type LookingFor = 'todo' | 'profesionales' | 'oficios';
+
 type State = {
   role: Role | null;
+  /** Qué busca el cliente: lo elige en el inicio y se respeta en búsqueda y mapa */
+  lookingFor: LookingFor;
   isAdmin: boolean;
   userName: string;
   userPhone: string;
   points: number;
   favorites: string[];
+  cart: Cart;
   orders: Order[];
   stamps: Record<string, number>;
   userReviews: Record<string, Review[]>;
   quotes: Quote[];
   posts: Post[];
   likedPosts: string[];
+  questions: Question[];
+  helpful: string[];
   // profesional
   profileVersion: number;
   biz: { disponible: boolean; nuevosClientes: boolean; enLinea: boolean };
@@ -78,6 +99,9 @@ type State = {
   requests: IncomingRequest[];
   replies: Record<string, string>;
   myAds: AdCampaign[];
+  myPromotions: MyPromotion[];
+  supplyRequests: SupplyRequest[];
+  providerInbox: ProviderRequest[];
   // administración
   pendingBusinesses: PendingBusiness[];
   reportedReviews: ReportedReview[];
@@ -89,13 +113,15 @@ const myBusiness = BUSINESSES.find((b) => b.slug === MY_BUSINESS_SLUG) as Busine
 
 const initialState: State = {
   role: null,
+  lookingFor: 'todo',
   isAdmin: false,
   userName: 'Ana',
   userPhone: '442 318 0094',
   points: 1240,
   favorites: ['plomeria-hernandez', 'despacho-contable-reyes'],
+  cart: { businessSlug: null, mode: 'para_llevar', lines: {} },
   orders: INITIAL_ORDERS,
-  stamps: {},
+  stamps: { 'despacho-contable-reyes': 9, 'plomeria-hernandez': 2, 'lic-mariana-ortiz': 1 },
   userReviews: {},
   quotes: [
     {
@@ -115,6 +141,8 @@ const initialState: State = {
   ],
   posts: POSTS,
   likedPosts: [],
+  questions: QUESTIONS,
+  helpful: [],
   profileVersion: 0,
   biz: { disponible: true, nuevosClientes: true, enLinea: true },
   myItems: myBusiness.items,
@@ -126,6 +154,27 @@ const initialState: State = {
   requests: INCOMING_REQUESTS,
   replies: {},
   myAds: [],
+  myPromotions: [{ id: 'mp1', title: 'Primera consulta en línea a $350', target: 'Clientes nuevos', reach: 412, redemptions: 38, active: true }],
+  supplyRequests: [
+    {
+      id: 'sr1',
+      part: 'Traducción certificada',
+      vehicle: 'Acta de matrimonio · inglés · para juicio de divorcio',
+      qty: 1,
+      urgent: true,
+      forCustomer: 'Lucía P.',
+      createdAt: Date.now() - 20 * 60000,
+      sentTo: 4,
+      responses: [
+        { id: 'r1', supplier: 'Traducciones Peritas Morales', distanceKm: 1.8, rating: 4.9, hasIt: true, brand: 'Perito autorizado', price: 450, readyIn: '48 h' },
+        { id: 'r2', supplier: 'Lingua Peritos', distanceKm: 3.1, rating: 4.7, hasIt: true, brand: 'Perito autorizado', price: 520, readyIn: '24 h' },
+      ],
+    },
+  ],
+  providerInbox: [
+    { id: 'pr1', from: 'Ortiz Salinas Abogados', distanceKm: 1.8, part: 'Juicio de arrendamiento', vehicle: 'Cliente con local comercial · 6 meses de adeudo', urgent: false, status: 'nueva' },
+    { id: 'pr2', from: 'Despacho Contable Reyes', distanceKm: 0.6, part: 'Testamento', vehicle: 'Cliente del despacho, 2 inmuebles', urgent: false, status: 'nueva' },
+  ],
   pendingBusinesses: [
     { id: 'pb1', name: 'Lic. Fernanda Ruiz', category: 'Abogados', zone: 'Juriquilla', owner: 'Fernanda R.' },
     { id: 'pb2', name: 'Valuadores del Bajío', category: 'Arquitectura e ingeniería', zone: 'Centro Sur', owner: 'Ing. Ramos' },
@@ -180,11 +229,45 @@ function useAppState() {
     () => ({
       setRole: (role: Role | null) => update((s) => ({ ...s, role })),
       setAdmin: (isAdmin: boolean) => update((s) => ({ ...s, isAdmin })),
+      setLookingFor: (lookingFor: LookingFor) => update((s) => ({ ...s, lookingFor })),
       toggleFavorite: (slug: string) =>
         update((s) => ({
           ...s,
           favorites: s.favorites.includes(slug) ? s.favorites.filter((f) => f !== slug) : [...s.favorites, slug],
         })),
+
+      // Contratar paquetes con precio fijo
+      setCartMode: (mode: OrderMode) => update((s) => ({ ...s, cart: { ...s.cart, mode } })),
+      addToCart: (businessSlug: string, itemId: string, delta: number) =>
+        update((s) => {
+          const lines = s.cart.businessSlug === businessSlug ? { ...s.cart.lines } : {};
+          const next = Math.max(0, (lines[itemId] ?? 0) + delta);
+          if (next === 0) delete lines[itemId];
+          else lines[itemId] = next;
+          return { ...s, cart: { ...s.cart, businessSlug: Object.keys(lines).length ? businessSlug : null, lines } };
+        }),
+      clearCart: () => update((s) => ({ ...s, cart: { ...s.cart, businessSlug: null, lines: {} } })),
+      placeOrder: (o: { business: Business; mode: OrderMode; method: PaymentMethod; total: number; note?: string }) => {
+        const id = uid();
+        track(o.business, 'pedido');
+        update((s) => {
+          const lines = Object.entries(s.cart.lines).map(([itemId, qty]) => {
+            const it = o.business.items.find((i) => i.id === itemId);
+            return { itemId, name: it?.name ?? 'Servicio', price: it?.price ?? 0, qty };
+          });
+          const detail = lines.map((l) => (l.qty > 1 ? `${l.qty} × ${l.name}` : l.name)).join(', ');
+          const order: Order = {
+            id, type: 'pedido', businessSlug: o.business.slug, businessName: o.business.name, detail, total: o.total, status: 'recibido',
+            createdAt: Date.now(), lines, mode: o.mode, paymentMethod: o.method, deliveryNote: o.note, customerName: `${s.userName} G.`,
+          };
+          const requests: IncomingRequest[] =
+            o.business.slug === MY_BUSINESS_SLUG
+              ? [{ id, type: 'contratacion', customer: `${s.userName} G.`, specialty: lines[0]?.name ?? '', detail, when: 'Pagado ahora', attend: o.mode === 'domicilio' ? 'domicilio' : o.mode === 'en_local' ? 'en_linea' : 'despacho', status: 'nueva', amount: o.total, paymentMethod: o.method }, ...s.requests]
+              : s.requests;
+          return { ...s, points: s.points + 20, orders: [order, ...s.orders], requests, cart: { ...s.cart, businessSlug: null, lines: {} } };
+        });
+        return id;
+      },
 
       // Cliente
       bookAppointment: (b: { business: Business; item: CatalogItem; staff: string; label: string; total: number }) => {
@@ -257,6 +340,23 @@ function useAppState() {
         }),
       addComment: (postId: string, author: string, body: string) =>
         update((s) => ({ ...s, posts: s.posts.map((p) => (p.id === postId ? { ...p, comments: [...p.comments, { author, body }] } : p)) })),
+      askQuestion: (q: { categorySlug: string; specialty?: string; body: string }) =>
+        update((s) => ({ ...s, questions: [{ ...q, id: uid(), author: `${s.userName} G.`, dateLabel: 'ahora', answers: [] }, ...s.questions] })),
+      answerQuestion: (questionId: string, body: string) =>
+        update((s) => ({
+          ...s,
+          questions: s.questions.map((q) => (q.id === questionId ? { ...q, answers: [...q.answers, { businessSlug: myBusiness.slug, body, helpful: 0 }] } : q)),
+        })),
+      markHelpful: (questionId: string, index: number) =>
+        update((s) => {
+          const key = `${questionId}:${index}`;
+          if (s.helpful.includes(key)) return s;
+          return {
+            ...s,
+            helpful: [...s.helpful, key],
+            questions: s.questions.map((q) => (q.id === questionId ? { ...q, answers: q.answers.map((a, i) => (i === index ? { ...a, helpful: a.helpful + 1 } : a)) } : q)),
+          };
+        }),
       publishPost: (p: Omit<Post, 'id' | 'businessSlug' | 'dateLabel' | 'likes' | 'comments'>) =>
         update((s) => ({
           ...s,
@@ -278,7 +378,47 @@ function useAppState() {
       toggleItem: (id: string) =>
         update((s) => ({ ...s, myItems: s.myItems.map((i) => (i.id === id ? { ...i, available: !i.available } : i)) })),
       registerSale: (sale: { amount: number; method: PaymentMethod; customerPhone?: string; customerName?: string }) =>
-        update((s) => ({ ...s, sales: [{ ...sale, id: uid(), createdAt: Date.now() }, ...s.sales] })),
+        update((s) => {
+          // Cobrar con el celular del cliente le suma un sello en su tarjeta de lealtad
+          const stamps = sale.customerPhone ? { ...s.stamps, [MY_BUSINESS_SLUG]: (s.stamps[MY_BUSINESS_SLUG] ?? 0) + 1 } : s.stamps;
+          return { ...s, stamps, sales: [{ ...sale, id: uid(), createdAt: Date.now() }, ...s.sales] };
+        }),
+      addPromotion: (p: Omit<MyPromotion, 'id' | 'redemptions' | 'active'>) => {
+        const id = uid();
+        // También aparece en "Promociones" del inicio de los clientes
+        PROMOTIONS.unshift({ id, title: p.title, subtitle: myBusiness.name, badge: 'NUEVA', kind: 'negocio', businessSlug: myBusiness.slug, photo: p.photo });
+        update((s) => ({ ...s, myPromotions: [{ ...p, id, redemptions: 0, active: true }, ...s.myPromotions] }));
+      },
+      togglePromotion: (id: string) =>
+        update((s) => ({ ...s, myPromotions: s.myPromotions.map((p) => (p.id === id ? { ...p, active: !p.active } : p)) })),
+
+      // Red de expertos
+      createSupplyRequest: (r: { part: string; vehicle: string; qty: number; urgent: boolean; forCustomer?: string }) => {
+        const id = uid();
+        update((s) => ({
+          ...s,
+          supplyRequests: [
+            {
+              ...r, id, createdAt: Date.now(), sentTo: 5,
+              responses: [
+                { id: uid(), supplier: 'Traducciones Peritas Morales', distanceKm: 1.8, rating: 4.9, hasIt: true, brand: 'Perito autorizado', price: 1450, readyIn: '48 h' },
+                { id: uid(), supplier: 'Valuadores del Bajío', distanceKm: 3.1, rating: 4.7, hasIt: true, brand: 'Perito valuador', price: 2200, readyIn: '3 días' },
+              ],
+            },
+            ...s.supplyRequests,
+          ],
+        }));
+        return id;
+      },
+      chooseSupplier: (requestId: string, responseId: string) =>
+        update((s) => ({ ...s, supplyRequests: s.supplyRequests.map((r) => (r.id === requestId ? { ...r, chosenId: responseId } : r)) })),
+      answerProvider: (id: string, answer: { hasIt: boolean; price?: number; readyIn?: string }) =>
+        update((s) => ({
+          ...s,
+          providerInbox: s.providerInbox.map((p) =>
+            p.id === id ? (answer.hasIt ? { ...p, status: 'ofertada', offerPrice: answer.price, readyIn: answer.readyIn } : { ...p, status: 'no_tengo' }) : p,
+          ),
+        })),
       respondRequest: (id: string, status: IncomingRequest['status'], quotedPrice?: number) =>
         update((s) => ({
           ...s,

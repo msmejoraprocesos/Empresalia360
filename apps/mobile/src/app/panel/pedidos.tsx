@@ -9,6 +9,8 @@ import type { IncomingRequest } from '@/data/types';
 import { money } from '@/lib/format';
 import { useApp } from '@/store/app';
 
+const PAY: Record<string, string> = { tarjeta: 'pagó con tarjeta', transferencia: 'pagó por transferencia', efectivo: 'paga en efectivo', liga: 'pagó en línea' };
+
 const STATUS: Record<IncomingRequest['status'], { text: string; bg: string; fg: string }> = {
   nueva: { text: 'Nueva', bg: Brand.mango, fg: Brand.ink },
   aceptada: { text: 'Confirmada', bg: Brand.nopalSoft, fg: Brand.nopalDark },
@@ -61,7 +63,9 @@ function RequestCard({ r }: { r: IncomingRequest }) {
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{r.customer}</Text>
-          <Text style={styles.sub}>{r.type === 'cita' ? 'Quiere una cita' : 'Pide cotización'}</Text>
+          <Text style={styles.sub}>
+            {r.type === 'cita' ? 'Quiere una cita' : r.type === 'cotizacion' ? 'Pide cotización' : `Contrató ${money(r.amount ?? 0)} · ${PAY[r.paymentMethod ?? 'tarjeta']}`}
+          </Text>
         </View>
         <Chip label={st.text} color={st.bg} ink={st.fg} />
       </View>
@@ -80,10 +84,10 @@ function RequestCard({ r }: { r: IncomingRequest }) {
 
       {r.status === 'cotizada' && r.quotedPrice ? <Text style={styles.quoted}>Cotizaste {money(r.quotedPrice)}</Text> : null}
 
-      {r.status === 'nueva' && r.type === 'cita' ? (
+      {r.status === 'nueva' && r.type !== 'cotizacion' ? (
         <View style={styles.actions}>
           <Button label="Rechazar" variant="ghost" small style={{ flex: 1 }} onPress={() => actions.respondRequest(r.id, 'rechazada')} />
-          <Button label="Confirmar cita" small style={{ flex: 1.4 }} onPress={() => actions.respondRequest(r.id, 'aceptada')} />
+          <Button label={r.type === 'cita' ? 'Confirmar cita' : 'Aceptar y empezar'} small style={{ flex: 1.4 }} onPress={() => actions.respondRequest(r.id, 'aceptada')} />
         </View>
       ) : null}
 

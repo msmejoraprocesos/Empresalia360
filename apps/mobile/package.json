@@ -25,6 +25,7 @@
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.6",
     "expo-web-browser": "~58.0.6",
+    "leaflet": "^1.9.4",
     "qrcode-generator": "^2.0.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -47,5 +48,8 @@
     "web": "expo start --web",
     "lint": "expo lint"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@types/leaflet": "^1.9.22"
+  }
 }

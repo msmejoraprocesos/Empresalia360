@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BusinessCard } from '@/components/business-card';
+import { LookingForSwitch } from '@/components/looking-for';
+import { PatternView } from '@/components/pattern-background';
 import { EmptyState, Header, RoundIconButton } from '@/components/ui';
 import { Brand, Radius, TabBarSpace } from '@/constants/theme';
-import { ATTEND_LABEL, CATEGORIES, searchProfessionals, specialtiesFor, type SearchFilters } from '@/data';
+import { ATTEND_LABEL, CATEGORIES, categoryBySlug, searchProfessionals, specialtiesFor, type SearchFilters } from '@/data';
 import type { Attend } from '@/data/types';
 import { useApp } from '@/store/app';
 
@@ -35,6 +37,7 @@ export default function Explorar() {
   const [attend, setAttend] = useState<Attend>();
   const [verified, setVerified] = useState(false);
   const [freeConsult, setFreeConsult] = useState(false);
+  const [urgent, setUrgent] = useState(false);
   const [sort, setSort] = useState<NonNullable<SearchFilters['sort']>>('relevancia');
   void state.profileVersion;
 
@@ -46,9 +49,10 @@ export default function Explorar() {
     setSpecialty(params.especialidad);
   }
 
-  const suggestions = specialtiesFor(q);
+  const lf = state.lookingFor;
+  const suggestions = specialtiesFor(q).filter((s) => lf === 'todo' || s.category.group === lf);
   const autoSpecialty = !specialty && suggestions.length === 1 ? suggestions[0].specialty : undefined;
-  const results = searchProfessionals(specialty ? '' : q, { specialty, attend, verified, freeConsult, sort });
+  const results = searchProfessionals(specialty ? '' : q, { specialty, attend, verified, freeConsult, sort }).filter((b) => !urgent || b.urgent24).filter((b) => lf === 'todo' || categoryBySlug(b.categorySlug)?.group === lf);
   const searching = Boolean(q.trim() || specialty);
 
   return (
@@ -85,6 +89,9 @@ export default function Explorar() {
       </Header>
 
       <ScrollView contentContainerStyle={{ paddingBottom: TabBarSpace, gap: 14, paddingTop: 14 }} keyboardShouldPersistTaps="handled">
+        <View style={{ paddingHorizontal: 16 }}>
+          <LookingForSwitch />
+        </View>
         {suggestions.length ? (
           <View style={{ gap: 8 }}>
             <Text style={[styles.label, { paddingHorizontal: 16 }]}>Especialidades que te pueden ayudar</Text>
@@ -106,7 +113,7 @@ export default function Explorar() {
           <View style={{ paddingHorizontal: 16, gap: 10 }}>
             <Text style={styles.label}>Explora por profesión u oficio</Text>
             <View style={styles.catWrap}>
-              {CATEGORIES.map((c) => (
+              {CATEGORIES.filter((c) => lf === 'todo' || c.group === lf).map((c) => (
                 <Pressable key={c.slug} accessibilityRole="button" onPress={() => router.push(`/categoria/${c.slug}`)} style={styles.cat}>
                   <Ionicons name={c.icon} size={16} color={Brand.chile} />
                   <Text style={styles.catText}>{c.name}</Text>
@@ -120,6 +127,7 @@ export default function Explorar() {
           {(['despacho', 'en_linea', 'domicilio'] as Attend[]).map((a) => (
             <Pill key={a} label={ATTEND_LABEL[a]} on={attend === a} icon="checkmark" onPress={() => setAttend(attend === a ? undefined : a)} />
           ))}
+          <Pill label="Urgencias 24 h" on={urgent} icon="checkmark" onPress={() => setUrgent(!urgent)} />
           <Pill label="Verificados" on={verified} icon="checkmark" onPress={() => setVerified(!verified)} />
           <Pill label="Primera consulta sin costo" on={freeConsult} icon="checkmark" onPress={() => setFreeConsult(!freeConsult)} />
         </ScrollView>
@@ -138,9 +146,25 @@ export default function Explorar() {
               ))}
             </ScrollView>
           </View>
-          {results.map((b) => (
-            <BusinessCard key={b.slug} business={b} source="buscar" highlight={specialty ?? autoSpecialty} />
-          ))}
+          {(['profesionales', 'oficios'] as const).filter((g) => lf === 'todo' || g === lf).map((g) => {
+            const part = results.filter((b) => categoryBySlug(b.categorySlug)?.group === g);
+            if (!part.length) return null;
+            return (
+              <PatternView key={g} kind={g} style={styles.segment}>
+                <View style={styles.segHead}>
+                  <Ionicons name={g === 'profesionales' ? 'briefcase' : 'hammer'} size={16} color={g === 'profesionales' ? Brand.chile : '#8A5A2B'} />
+                  <Text style={[styles.segTitle, g === 'oficios' && { color: '#5E3C1A' }]}>
+                    {g === 'profesionales' ? 'Profesionales' : 'Oficios'} · {part.length}
+                  </Text>
+                </View>
+                <View style={{ gap: 10 }}>
+                  {part.map((b) => (
+                    <BusinessCard key={b.slug} business={b} source="buscar" highlight={specialty ?? autoSpecialty} />
+                  ))}
+                </View>
+              </PatternView>
+            );
+          })}
           {results.length === 0 ? (
             <EmptyState icon="search-outline" title="Sin resultados" text="Prueba con otras palabras, como “divorcio”, “fuga” o “declaración”, o quita algún filtro." />
           ) : null}
@@ -162,5 +186,8 @@ const styles = StyleSheet.create({
   catText: { fontSize: 13, fontWeight: '700', color: Brand.ink },
   resultsHead: { gap: 6 },
   count: { fontSize: 18, fontWeight: '800', color: Brand.ink },
+  segment: { borderRadius: 22, padding: 10, borderWidth: 1, borderColor: Brand.line },
+  segHead: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingBottom: 10 },
+  segTitle: { fontSize: 15, fontWeight: '800', color: Brand.chileDark },
   sort: { fontSize: 13, color: Brand.inkSoft, paddingVertical: 4, paddingRight: 10 },
 });

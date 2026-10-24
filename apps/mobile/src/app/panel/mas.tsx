@@ -8,6 +8,7 @@ import { myBusiness, useApp } from '@/store/app';
 export default function Mas() {
   const router = useRouter();
   const { state, actions } = useApp();
+  const newRequests = state.providerInbox.filter((p) => p.status === 'nueva').length;
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
@@ -18,7 +19,8 @@ export default function Mas() {
           <ListRow icon="person-circle-outline" iconBg={Brand.chileSoft} iconColor={Brand.chileDark} title="Editar perfil y especialidades" subtitle={myBusiness.specialties.join(', ') || 'Agrega tus especialidades'} onPress={() => router.push('/mi-negocio/perfil')} />
           <ListRow icon="eye-outline" iconBg={Brand.line} title="Ver mi perfil público" subtitle="Así te ven tus clientes" onPress={() => router.push(`/negocio/${myBusiness.slug}`)} />
           <ListRow icon="briefcase-outline" iconBg={Brand.nopalSoft} iconColor={Brand.nopalDark} title="Servicios y precios" subtitle={`${state.myItems.length} servicios`} onPress={() => router.push('/mi-negocio/productos')} />
-          <ListRow icon="calendar-outline" iconBg={Brand.albercaSoft} iconColor="#1757B8" title="Agenda" subtitle="Citas y horarios" onPress={() => router.push('/mi-negocio/agenda')} last />
+          <ListRow icon="calendar-outline" iconBg={Brand.albercaSoft} iconColor="#1757B8" title="Agenda" subtitle="Citas y horarios" onPress={() => router.push('/mi-negocio/agenda')} />
+          <ListRow icon="people-outline" iconBg={Brand.jacarandaSoft} iconColor={Brand.jacaranda} title="Clientes y lealtad" subtitle="Clientes frecuentes y tarjeta de sellos" onPress={() => router.push('/mi-negocio/clientes')} last />
         </Card>
 
         <Text style={styles.section}>Cobros</Text>
@@ -30,9 +32,16 @@ export default function Mas() {
         <Text style={styles.section}>Crecer</Text>
         <Card style={{ paddingVertical: 4 }}>
           <ListRow icon="stats-chart-outline" iconBg={Brand.chileSoft} iconColor={Brand.chileDark} title="Estadísticas" subtitle="Quién ve tu perfil y qué te piden" onPress={() => router.push('/mi-negocio/estadisticas')} />
+          <ListRow icon="pricetag-outline" iconBg={Brand.mangoSoft} iconColor="#7A5600" title="Promociones" subtitle={`${state.myPromotions.filter((p) => p.active).length} activas`} onPress={() => router.push('/mi-negocio/promociones')} />
           <ListRow icon="megaphone-outline" iconBg={Brand.mangoSoft} iconColor="#7A5600" title="Publicar en la comunidad" subtitle="Anuncia un servicio, un consejo o un evento" onPress={() => router.push('/mi-negocio/publicar')} />
           <ListRow icon="trophy-outline" iconBg={Brand.chileSoft} iconColor={Brand.chileDark} title="Espacios destacados" subtitle="Aparece primero en tu especialidad" onPress={() => router.push('/mi-negocio/espacios')} />
           <ListRow icon="globe-outline" iconBg={Brand.jacarandaSoft} iconColor={Brand.jacaranda} title="Mi página y QR" subtitle={`expertalia360.mx/${myBusiness.slug}`} onPress={() => router.push(`/n/${myBusiness.slug}`)} last />
+        </Card>
+
+        <Text style={styles.section}>Red de expertos</Text>
+        <Card style={{ paddingVertical: 4 }}>
+          <ListRow icon="git-network-outline" iconBg={Brand.albercaSoft} iconColor="#1757B8" title="Pedir apoyo a otros expertos" subtitle="Perito, traductor, notario o contador para tu cliente" onPress={() => router.push('/mi-negocio/red')} />
+          <ListRow icon="mail-unread-outline" iconBg={Brand.nopalSoft} iconColor={Brand.nopalDark} title="Lo que otros expertos te piden" subtitle={newRequests ? `${newRequests} nuevas` : 'Sin encargos nuevos'} onPress={() => router.push('/mi-negocio/proveedor')} last />
         </Card>
 
         <Text style={styles.section}>Cuenta</Text>

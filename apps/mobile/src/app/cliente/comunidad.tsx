@@ -2,32 +2,88 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FeedFilters, PostCard, type FeedFilter } from '@/components/community-feed';
-import { EmptyState, Header } from '@/components/ui';
-import { Brand, TabBarSpace } from '@/constants/theme';
+import { Pattern } from '@/components/pattern-background';
+import { AskForm, QuestionCard } from '@/components/questions';
+import { Card, EmptyState, Header, Segmented } from '@/components/ui';
+import { Brand, Radius, TabBarSpace } from '@/constants/theme';
 import { useApp } from '@/store/app';
+
+const LEVELS = [
+  { name: 'Nuevo', min: 0 },
+  { name: 'Cliente', min: 300 },
+  { name: 'Cliente frecuente', min: 1000 },
+  { name: 'Embajador', min: 2000 },
+];
 
 export default function Comunidad() {
   const { state } = useApp();
+  const [tab, setTab] = useState<'muro' | 'preguntas'>('muro');
   const [filter, setFilter] = useState<FeedFilter>('todos');
   const posts = state.posts.filter((p) => filter === 'todos' || p.kind === filter);
+  const level = [...LEVELS].reverse().find((l) => state.points >= l.min) ?? LEVELS[0];
+  const next = LEVELS[LEVELS.indexOf(level) + 1];
+  const progress = next ? (state.points - level.min) / (next.min - level.min) : 1;
 
   return (
-    <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
-      <Header title="Comunidad" subtitle="Servicios, consejos y eventos de expertos de tu zona" back={false} />
-      <ScrollView contentContainerStyle={{ paddingBottom: TabBarSpace, paddingTop: 14, gap: 12 }}>
-        <FeedFilters value={filter} onChange={setFilter} />
-        <View style={{ paddingHorizontal: 16, gap: 12 }}>
-          <Text style={styles.note}>Solo publican profesionales y oficios verificados. Las preguntas que dejes aquí las ve toda la comunidad.</Text>
-          {posts.map((p) => (
-            <PostCard key={p.id} post={p} />
-          ))}
-          {posts.length === 0 ? <EmptyState icon="megaphone-outline" title="Nada por aquí" text="Prueba con otro filtro." /> : null}
+    <View style={{ flex: 1 }}>
+      <Pattern kind="comunidad" />
+      <Header title="Comunidad" subtitle="Servicios, consejos y preguntas a expertos de tu zona" back={false}>
+        <View style={{ marginTop: 14 }}>
+          <Segmented
+            dark
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'muro', label: 'Muro' },
+              { value: 'preguntas', label: `Preguntas (${state.questions.length})` },
+            ]}
+          />
         </View>
+      </Header>
+      <ScrollView contentContainerStyle={{ paddingBottom: TabBarSpace, paddingTop: 14, gap: 12 }} keyboardShouldPersistTaps="handled">
+        <View style={{ paddingHorizontal: 16 }}>
+          <Card style={styles.level}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text style={styles.levelName}>{level.name}</Text>
+              <Text style={styles.levelPts}>{state.points.toLocaleString('es-MX')} puntos</Text>
+            </View>
+            <View style={styles.track}>
+              <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
+            </View>
+            <Text style={styles.levelSub}>
+              {next ? `${next.min - state.points} puntos para ser ${next.name}. Sumas al agendar, reseñar y recomendar.` : 'Eres Embajador de Expertalia 360.'}
+            </Text>
+          </Card>
+        </View>
+
+        {tab === 'muro' ? (
+          <>
+            <FeedFilters value={filter} onChange={setFilter} />
+            <View style={{ paddingHorizontal: 16, gap: 12 }}>
+              {posts.map((p) => (
+                <PostCard key={p.id} post={p} />
+              ))}
+              {posts.length === 0 ? <EmptyState icon="megaphone-outline" title="Nada por aquí" text="Prueba con otro filtro." /> : null}
+            </View>
+          </>
+        ) : (
+          <View style={{ paddingHorizontal: 16, gap: 12 }}>
+            <AskForm />
+            {state.questions.map((q) => (
+              <QuestionCard key={q.id} q={q} />
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  note: { fontSize: 12, color: Brand.inkSoft, lineHeight: 17 },
+  level: { gap: 8, backgroundColor: Brand.ink },
+  levelName: { fontSize: 18, fontWeight: '800', color: Brand.white },
+  levelPts: { fontSize: 13, fontWeight: '700', color: Brand.mango },
+  track: { height: 8, borderRadius: Radius.pill, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden' },
+  fill: { height: 8, borderRadius: Radius.pill, backgroundColor: Brand.mango },
+  levelSub: { fontSize: 12, color: '#B7C1D3' },
 });

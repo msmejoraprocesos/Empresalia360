@@ -4,10 +4,11 @@ import { useState, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BusinessCard } from '@/components/business-card';
+import { PhotoPicker } from '@/components/photo-picker';
 import { BottomBar, Button, Card, Field, Header } from '@/components/ui';
 import { Brand, Radius } from '@/constants/theme';
 import { ATTEND_ICON, ATTEND_LABEL, CATEGORIES, categoryBySlug } from '@/data';
-import type { Attend, Business } from '@/data/types';
+import type { Attend, Business, GalleryItem } from '@/data/types';
 import { myBusiness, useApp } from '@/store/app';
 
 const LANGS = ['Español', 'Inglés', 'Francés', 'Alemán', 'Lengua de señas'];
@@ -59,6 +60,14 @@ export default function EditarPerfil() {
   const [address, setAddress] = useState(myBusiness.address);
   const [zone, setZone] = useState(myBusiness.zone);
   const [phone, setPhone] = useState(myBusiness.phone.replace(/^521/, ''));
+  const [photo, setPhoto] = useState(myBusiness.photo);
+  const [cover, setCover] = useState(myBusiness.cover);
+  const [gallery, setGallery] = useState<GalleryItem[]>(myBusiness.gallery ?? []);
+  const [newShot, setNewShot] = useState<string>();
+  const [newCaption, setNewCaption] = useState('');
+  const [references, setReferences] = useState(myBusiness.references ?? '');
+  const [urgent24, setUrgent24] = useState(Boolean(myBusiness.urgent24));
+  const [warranty, setWarranty] = useState(myBusiness.warranty ?? '');
 
   const cat = categoryBySlug(categorySlug);
   const extra = specialties.filter((s) => !cat?.specialties.some((x) => x.name === s));
@@ -81,6 +90,12 @@ export default function EditarPerfil() {
     zone: zone.trim(),
     phone: phone.replace(/\D/g, '') ? `521${phone.replace(/\D/g, '')}` : myBusiness.phone,
     subtitle: `${profession.trim()} · ${specialties.slice(0, 2).join(' y ').toLowerCase()}`,
+    photo,
+    cover,
+    gallery,
+    references: references.trim() || undefined,
+    urgent24,
+    warranty: warranty.trim() || undefined,
   };
   const preview: Business = { ...myBusiness, ...patch };
   const valid = patch.name.length > 2 && patch.profession.length > 2 && specialties.length > 0 && attends.length > 0;
@@ -134,7 +149,64 @@ export default function EditarPerfil() {
           />
         </Section>
 
-        <Section step={2} title="Tus especialidades" hint="Así te encuentran los clientes cuando describen su problema">
+        <Section step={2} title="Tus fotos" hint="Los perfiles con foto reciben más visitas y confianza">
+          <PhotoPicker
+            label="Foto de perfil"
+            aspect={[1, 1]}
+            value={photo}
+            onChange={(u) => {
+              setPhoto(u);
+              touch();
+            }}
+            hint="Una foto tuya, de frente y con buena luz"
+          />
+          <PhotoPicker
+            label="Portada"
+            aspect={[16, 9]}
+            value={cover}
+            onChange={(u) => {
+              setCover(u);
+              touch();
+            }}
+            hint="Tu despacho, tu taller o un trabajo terminado"
+          />
+          <Text style={styles.fieldLabel}>Galería de trabajos o despacho ({gallery.length})</Text>
+          {gallery.map((g) => (
+            <View key={g.id} style={styles.galleryRow}>
+              <Ionicons name="image" size={18} color={Brand.chile} />
+              <Text style={{ flex: 1, color: Brand.ink }} numberOfLines={1}>
+                {g.caption}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Quitar ${g.caption}`}
+                onPress={() => {
+                  setGallery(gallery.filter((x) => x.id !== g.id));
+                  touch();
+                }}
+                hitSlop={8}>
+                <Ionicons name="trash-outline" size={18} color={Brand.inkSoft} />
+              </Pressable>
+            </View>
+          ))}
+          <PhotoPicker label="Agregar a la galería" value={newShot} onChange={setNewShot} hint="Antes y después, un trabajo terminado o tu lugar de trabajo" />
+          <Field label="Descripción de la foto" value={newCaption} onChangeText={setNewCaption} placeholder="Cambio de calentador de paso" />
+          <Button
+            label="Agregar a la galería"
+            small
+            variant="dark"
+            icon="add"
+            disabled={!newShot || !newCaption.trim()}
+            onPress={() => {
+              setGallery([...gallery, { id: String(Date.now()), caption: newCaption.trim(), uri: newShot }]);
+              setNewShot(undefined);
+              setNewCaption('');
+              touch();
+            }}
+          />
+        </Section>
+
+        <Section step={3} title="Tus especialidades" hint="Así te encuentran los clientes cuando describen su problema">
           <View style={styles.wrap}>
             {cat?.specialties.map((s) => (
               <Toggle
@@ -183,7 +255,7 @@ export default function EditarPerfil() {
           {specialties.length === 0 ? <Text style={styles.warn}>Elige al menos una especialidad.</Text> : null}
         </Section>
 
-        <Section step={3} title="Experiencia y credenciales" hint="Los perfiles con cédula verificada reciben más confianza">
+        <Section step={4} title="Experiencia y credenciales" hint="Los perfiles con cédula verificada reciben más confianza">
           <Field
             label="Años de experiencia"
             value={years}
@@ -228,7 +300,7 @@ export default function EditarPerfil() {
           </View>
         </Section>
 
-        <Section step={4} title="Cómo y dónde atiendes">
+        <Section step={5} title="Cómo y dónde atiendes">
           <View style={styles.wrap}>
             {(['despacho', 'en_linea', 'domicilio'] as Attend[]).map((a) => (
               <Toggle
@@ -276,6 +348,16 @@ export default function EditarPerfil() {
             placeholder="Plaza Zen, local 8"
           />
           <Field
+            label="Referencias para llegar"
+            value={references}
+            onChangeText={(t) => {
+              setReferences(t);
+              touch();
+            }}
+            multiline
+            placeholder="Planta alta, frente al Oxxo; hay estacionamiento de la plaza"
+          />
+          <Field
             label="Colonia o zona"
             value={zone}
             onChangeText={(t) => {
@@ -283,6 +365,26 @@ export default function EditarPerfil() {
               touch();
             }}
             placeholder="Querétaro Centro"
+          />
+          <View style={styles.wrap}>
+            <Toggle
+              label="Atiendo urgencias 24 h"
+              icon="flash-outline"
+              on={urgent24}
+              onPress={() => {
+                setUrgent24(!urgent24);
+                touch();
+              }}
+            />
+          </View>
+          <Field
+            label="Garantía (opcional)"
+            value={warranty}
+            onChangeText={(t) => {
+              setWarranty(t);
+              touch();
+            }}
+            placeholder="Garantía de 3 meses por escrito"
           />
           <Field
             label="WhatsApp"
@@ -296,7 +398,7 @@ export default function EditarPerfil() {
           />
         </Section>
 
-        <Section step={5} title="Sobre ti" hint="Cuenta en pocas líneas cómo trabajas y en qué casos ayudas">
+        <Section step={6} title="Sobre ti" hint="Cuenta en pocas líneas cómo trabajas y en qué casos ayudas">
           <Field
             label="Descripción"
             value={description}
@@ -347,6 +449,7 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 13, fontWeight: '600', color: Brand.ink },
   addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   addInput: { flex: 1, height: 44, borderRadius: Radius.md, borderWidth: 1, borderColor: Brand.line, paddingHorizontal: 12, fontSize: 14, color: Brand.ink, backgroundColor: Brand.white },
+  galleryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: Radius.sm, backgroundColor: Brand.tortilla },
   warn: { fontSize: 12, color: Brand.bugambilia, fontWeight: '700' },
   savedNote: { fontSize: 12, color: Brand.nopalDark, fontWeight: '700', textAlign: 'center' },
 });

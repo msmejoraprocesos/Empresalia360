@@ -4,9 +4,10 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProAvatar } from '@/components/business-card';
+import { Pattern } from '@/components/pattern-background';
 import { Button, Card, Chip, SectionTitle, ToggleRow } from '@/components/ui';
 import { Brand, Radius, Shadow, ShadowStrong, TabBarSpace } from '@/constants/theme';
-import { ATTEND_LABEL, profileCompleteness } from '@/data';
+import { ATTEND_LABEL, categoryBySlug, profileCompleteness } from '@/data';
 import type { IconName } from '@/data/types';
 import { useBusinessStats } from '@/hooks/use-business-stats';
 import { money } from '@/lib/format';
@@ -33,6 +34,7 @@ export default function ProfesionalInicio() {
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
+      <Pattern kind={categoryBySlug(myBusiness.categorySlug)?.group ?? 'profesionales'} />
       <ScrollView contentContainerStyle={{ paddingBottom: TabBarSpace }}>
         <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
