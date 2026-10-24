@@ -11,6 +11,8 @@ import { ATTEND_ICON, ATTEND_LABEL, CATEGORIES, categoryBySlug } from '@/data';
 import type { Attend, Business, GalleryItem } from '@/data/types';
 import { Emoji } from '@/components/emoji';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { WorldGuide } from '@/components/world-guide';
+import type { World } from '@/constants/world';
 import { activePlan, CATEGORY_LIMIT, PLANS } from '@/data/billing';
 import { myBusiness, useApp } from '@/store/app';
 
@@ -74,7 +76,12 @@ function Editor() {
 
   const [name, setName] = useState(myBusiness.name);
   const [categorySlug, setCategorySlug] = useState(myBusiness.categorySlug);
-  const [extraCats, setExtraCats] = useState<string[]>((myBusiness.categorySlugs ?? []).filter((s) => s !== myBusiness.categorySlug));
+  // Perfil nuevo: primero elige su mundo (profesionista u oficio); los mundos no se mezclan
+  const isNew = myBusiness.id === 'nuevo';
+  const [world, setWorld] = useState<World | null>(isNew ? null : categoryBySlug(myBusiness.categorySlug)?.group ?? null);
+  const [extraCats, setExtraCats] = useState<string[]>(
+    (myBusiness.categorySlugs ?? []).filter((s) => s !== myBusiness.categorySlug && categoryBySlug(s)?.group === categoryBySlug(myBusiness.categorySlug)?.group),
+  );
   const [profession, setProfession] = useState(myBusiness.profession);
   const [specialties, setSpecialties] = useState<string[]>(myBusiness.specialties);
   const [custom, setCustom] = useState('');
@@ -100,7 +107,7 @@ function Editor() {
   const [paymentInfo, setPaymentInfo] = useState(myBusiness.paymentInfo ?? '');
 
   const cat = categoryBySlug(categorySlug);
-  const selectedCats = [categorySlug, ...extraCats].map((s) => categoryBySlug(s)).filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const selectedCats = (world ? [categorySlug, ...extraCats] : []).map((s) => categoryBySlug(s)).filter((c): c is NonNullable<typeof c> => Boolean(c));
   const extra = specialties.filter((s) => !selectedCats.some((c) => c.specialties.some((x) => x.name === s)));
   // Cuántas categorías permite su plan (la principal cuenta)
   const bill = state.billing[myBusiness.slug];
@@ -135,7 +142,7 @@ function Editor() {
     paymentInfo: paymentInfo.trim() || undefined,
   };
   const preview: Business = { ...myBusiness, ...patch };
-  const valid = patch.name.length > 2 && patch.profession.length > 2 && specialties.length > 0 && attends.length > 0;
+  const valid = Boolean(world) && categoryBySlug(categorySlug)?.group === world && patch.name.length > 2 && patch.profession.length > 2 && specialties.length > 0 && attends.length > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
@@ -156,9 +163,26 @@ function Editor() {
             }}
             placeholder="Lic. Mariana Ortiz"
           />
-          <Text style={styles.fieldLabel}>Profesión u oficio</Text>
+          <Text style={styles.fieldLabel}>¿A qué mundo perteneces?</Text>
+          <WorldGuide
+            value={world}
+            onChange={(w) => {
+              if (w === world) return;
+              setWorld(w);
+              // Al cambiar de mundo se limpia lo del otro mundo
+              if (categoryBySlug(categorySlug)?.group !== w) {
+                const first = CATEGORIES.find((c) => c.group === w)!;
+                setCategorySlug(first.slug);
+                setProfession(first.professional);
+                setExtraCats([]);
+                setSpecialties([]);
+              }
+              touch();
+            }}
+          />
+          {world ? <Text style={styles.fieldLabel}>{world === 'profesionales' ? 'Tu profesión' : 'Tu oficio'}</Text> : null}
           <View style={styles.wrap}>
-            {CATEGORIES.map((c) => (
+            {CATEGORIES.filter((c) => c.group === world).map((c) => (
               <Toggle
                 key={c.slug}
                 label={c.name}
@@ -178,6 +202,7 @@ function Editor() {
               />
             ))}
           </View>
+          {world ? <>
           <Text style={styles.fieldLabel}>¿Ofreces algo más? Aparece también en</Text>
           <Text style={styles.hint}>
             {maxExtra > 0
@@ -185,7 +210,7 @@ function Editor() {
               : 'Con el plan Estándar apareces en 1 categoría. Con Premium, en 3; con VIP, en 6.'}
           </Text>
           <View style={styles.wrap}>
-            {CATEGORIES.filter((c) => c.slug !== categorySlug).map((c) => {
+            {CATEGORIES.filter((c) => c.group === world && c.slug !== categorySlug).map((c) => {
               const on = extraCats.includes(c.slug);
               const locked = !on && extraCats.length >= maxExtra;
               return (
@@ -209,6 +234,7 @@ function Editor() {
             })}
           </View>
           {maxExtra < 5 ? <Button label={maxExtra > 0 ? 'Quiero más categorías: ver planes' : 'Aparecer en más categorías: ver planes'} small variant="ghost" icon="ribbon-outline" onPress={() => router.push('/mi-negocio/plan')} /> : null}
+          </> : null}
           <Field
             label="Título que se muestra"
             value={profession}

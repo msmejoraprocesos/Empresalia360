@@ -163,7 +163,9 @@ begin
   new.extra_categories := coalesce(array(
     select t.c from unnest(new.extra_categories) with ordinality as t(c, o)
     where t.c <> coalesce((select slug from public.categories where id = new.category_id), '')
-      and exists (select 1 from public.categories x where x.slug = t.c)
+      -- solo categorías del mismo mundo que la principal (un abogado nunca sale en oficios)
+      and exists (select 1 from public.categories x where x.slug = t.c
+                  and x.world = (select world from public.categories where id = new.category_id))
     group by t.c order by min(t.o)
   ), '{}');
   if session_user <> 'authenticator' or public.is_admin() then

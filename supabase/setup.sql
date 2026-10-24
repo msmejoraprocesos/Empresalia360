@@ -1427,7 +1427,9 @@ begin
   new.extra_categories := coalesce(array(
     select t.c from unnest(new.extra_categories) with ordinality as t(c, o)
     where t.c <> coalesce((select slug from public.categories where id = new.category_id), '')
-      and exists (select 1 from public.categories x where x.slug = t.c)
+      -- solo categorías del mismo mundo que la principal (un abogado nunca sale en oficios)
+      and exists (select 1 from public.categories x where x.slug = t.c
+                  and x.world = (select world from public.categories where id = new.category_id))
     group by t.c order by min(t.o)
   ), '{}');
   if session_user <> 'authenticator' or public.is_admin() then
@@ -1910,7 +1912,7 @@ select 'Arq. Diego Fuentes', 'arq-diego-fuentes', 'Arquitecto · proyectos y lic
   '5214420000110', '5214420000110', 'Av. Industrial 102',
   extensions.st_setsrid(extensions.st_makepoint(-100.3235, 20.6015), 4326)::extensions.geography,
   false, true, true, 'premium', 'activo', true, null,
-  'Arquitecto', array['Proyecto arquitectónico', 'Licencias de construcción', 'Remodelación', 'Albañilería', 'Impermeabilización']::text[], array['pintura-y-albanileria']::text[], 14, 'Cédula 5520981 · DRO registrado', 'Arquitectura, UAQ', array['Español']::text[], array['domicilio', 'despacho']::text[], 800, 'Responde en menos de 1 día', null, false, null, null, null, null
+  'Arquitecto', array['Proyecto arquitectónico', 'Licencias de construcción', 'Remodelación']::text[], '{}'::text[], 14, 'Cédula 5520981 · DRO registrado', 'Arquitectura, UAQ', array['Español']::text[], array['domicilio', 'despacho']::text[], 800, 'Responde en menos de 1 día', null, false, null, null, null, null
 where not exists (select 1 from public.businesses where slug = 'arq-diego-fuentes');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'arq-diego-fuentes'), 'reservar') on conflict do nothing;
@@ -2115,7 +2117,7 @@ select 'Acabados Mendoza', 'acabados-mendoza', 'Pintura e impermeabilización', 
   '5214420000117', '5214420000117', 'Servicio a domicilio',
   extensions.st_setsrid(extensions.st_makepoint(-100.3225, 20.6028), 4326)::extensions.geography,
   true, true, true, 'premium', 'activo', false, null,
-  'Maestro de obra', array['Pintura', 'Impermeabilización', 'Albañilería']::text[], '{}'::text[], 22, null, null, array['Español']::text[], array['domicilio']::text[], 0, 'Cotiza en 24 h', null, false, 'Garantía de 5 años en impermeabilización', null, null, null
+  'Maestro de obra', array['Pintura', 'Impermeabilización', 'Albañilería', 'Puertas y ventanas']::text[], array['carpinteria']::text[], 22, null, null, array['Español']::text[], array['domicilio']::text[], 0, 'Cotiza en 24 h', null, false, 'Garantía de 5 años en impermeabilización', null, null, null
 where not exists (select 1 from public.businesses where slug = 'acabados-mendoza');
 
 insert into public.business_modules (business_id, module) values ((select id from public.businesses where slug = 'acabados-mendoza'), 'cotizar') on conflict do nothing;

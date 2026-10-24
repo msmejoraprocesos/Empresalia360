@@ -17,7 +17,10 @@ export function getBusiness(slug: string | undefined): Business | undefined {
 
 /** Todas las categorías del experto: la principal primero, luego las demás */
 export function categoriesOf(b: Business): string[] {
-  return Array.from(new Set([b.categorySlug, ...(b.categorySlugs ?? [])]));
+  // Las extra siempre son del mismo mundo que la principal (los mundos no se mezclan)
+  const world = CATEGORIES.find((c) => c.slug === b.categorySlug)?.group;
+  const extras = (b.categorySlugs ?? []).filter((s) => CATEGORIES.find((c) => c.slug === s)?.group === world);
+  return Array.from(new Set([b.categorySlug, ...extras]));
 }
 
 export const inCategory = (b: Business, slug: string) => categoriesOf(b).includes(slug);

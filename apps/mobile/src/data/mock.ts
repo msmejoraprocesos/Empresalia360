@@ -1033,12 +1033,13 @@ const PACKAGES: Record<string, Business['items']> = {
 
 /**
  * Expertos que trabajan en varias categorías: aparecen en cada una (y en los dos mundos si aplica).
- * Ej. un despacho contable que también da consultoría, o un arquitecto que también hace obra.
+ * Siempre dentro de su mismo mundo: un despacho contable que también da consultoría,
+ * o un maestro de obra que también hace carpintería. Un abogado nunca sale en oficios.
  */
 const MULTI: Record<string, { categories: string[]; specialties: string[] }> = {
   'despacho-contable-reyes': { categories: ['consultoria'], specialties: ['Finanzas para PyME'] },
   'ortiz-salinas-abogados': { categories: ['contadores'], specialties: ['Contabilidad de empresas'] },
-  'arq-diego-fuentes': { categories: ['pintura-y-albanileria'], specialties: ['Albañilería', 'Impermeabilización'] },
+  'acabados-mendoza': { categories: ['carpinteria'], specialties: ['Puertas y ventanas'] },
   'electrica-ramirez': { categories: ['climas'], specialties: ['Minisplits'] },
 };
 
