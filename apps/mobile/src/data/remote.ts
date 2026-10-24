@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 import { OPENING_ADS } from './ads';
 import { BUSINESSES, CATEGORIES, POSTS, QUESTIONS, ZONE } from './mock';
+import type { Billing, PlanId, SubPayment } from './billing';
 import type { Attend, Business, CatalogItem, GalleryItem, IncomingRequest, Module, Order, PaymentMethod, Post, Question, Review } from './types';
 
 type Row = {
@@ -407,6 +408,50 @@ export const remote = {
     const { error } = await supabase.from('sales').insert({ business_id: business.id, amount: s.amount, payment_method: s.method, customer_phone: s.customerPhone ?? null, note });
     warn('cobro', error);
   },
+  /** El negocio avisa que pagó su mensualidad (con comprobante opcional en el bucket privado) */
+  async reportSubPayment(slug: string, p: SubPayment) {
+    if (!supabase) return;
+    const b = BUSINESSES.find((x) => x.slug === slug);
+    if (!b || !isUuid(b.id)) return;
+    let receipt_path: string | null = null;
+    if (p.receipt && !p.receipt.startsWith('http')) {
+      try {
+        const blob = await (await fetch(p.receipt)).blob();
+        const ext = blob.type.includes('pdf') ? 'pdf' : blob.type.includes('png') ? 'png' : 'jpg';
+        const path = `${slug}/mensualidades/${Date.now()}.${ext}`;
+        const up = await supabase.storage.from('comprobantes').upload(path, await blob.arrayBuffer(), { contentType: blob.type || 'image/jpeg' });
+        if (!up.error) receipt_path = path;
+      } catch {
+        // sin comprobante: el administrador lo revisa con la referencia
+      }
+    }
+    const { error } = await supabase.from('subscription_payments').insert({
+      business_id: b.id, plan: p.plan, months: p.months, amount: p.amount, method: p.method, reference: p.reference ?? null, receipt_path,
+    });
+    warn('mensualidad', error);
+  },
+  async adminRegisterSubPayment(slug: string, p: { plan: PlanId; months: number; amount: number; method: SubPayment['method'] }) {
+    if (!supabase) return;
+    const b = BUSINESSES.find((x) => x.slug === slug);
+    if (!b || !isUuid(b.id)) return;
+    const { data, error } = await supabase
+      .from('subscription_payments')
+      .insert({ business_id: b.id, plan: p.plan, months: p.months, amount: p.amount, method: p.method, reference: 'Registrado por el administrador' })
+      .select('id')
+      .single();
+    if (!warn('registrar mensualidad', error) || !data) return;
+    await remote.confirmSubPayment(data.id as string);
+  },
+  async confirmSubPayment(paymentId: string) {
+    if (!supabase || !isUuid(paymentId)) return;
+    const { error } = await supabase.rpc('confirm_subscription_payment', { p_payment: paymentId });
+    warn('confirmar mensualidad', error);
+  },
+  async rejectSubPayment(paymentId: string) {
+    if (!supabase || !isUuid(paymentId)) return;
+    const { error } = await supabase.from('subscription_payments').update({ status: 'rechazado' }).eq('id', paymentId);
+    warn('rechazar mensualidad', error);
+  },
   async replyReview(reviewId: string, reply: string) {
     if (!supabase || !isUuid(reviewId)) return;
     const { error } = await supabase.from('reviews').update({ reply, replied_at: new Date().toISOString() }).eq('id', reviewId);
@@ -554,4 +599,43 @@ export async function saveBusiness(current: Business, patch: Partial<Business>, 
     warn('galería', gErr);
   }
   return { ...next, id, slug, photo, cover, gallery, verified: owned ? current.verified : false, rating: owned ? current.rating : 0, ratingCount: owned ? current.ratingCount : 0, reviews: owned ? current.reviews : [], items: owned ? current.items : await loadItems(id), closesAt: owned ? current.closesAt : '18:00', modules: owned ? current.modules : ['reservar', 'cotizar', 'consulta'] };
+}
+
+/**
+ * Mensualidades: el administrador ve las de todos; el dueño, solo las suyas (lo filtra RLS).
+ * Los comprobantes son privados: se regresa una liga temporal de 1 hora.
+ */
+export async function loadBilling(): Promise<Record<string, Billing> | null> {
+  if (!supabase) return null;
+  const [biz, pays] = await Promise.all([
+    supabase.from('businesses').select('id, slug, plan, paid_plan, paid_until'),
+    supabase
+      .from('subscription_payments')
+      .select('id, business_id, plan, months, amount, method, reference, receipt_path, status, period_end, created_at')
+      .order('created_at', { ascending: false })
+      .limit(500),
+  ]);
+  if (biz.error || !biz.data) return null;
+  type PayRow = { id: string; business_id: string; plan: PlanId; months: number; amount: number; method: SubPayment['method']; reference: string | null; receipt_path: string | null; status: SubPayment['status']; period_end: string | null; created_at: string };
+  const rows = (pays.data as PayRow[] | null) ?? [];
+  const signed: Record<string, string> = {};
+  const paths = rows.map((r) => r.receipt_path).filter((x): x is string => Boolean(x));
+  if (paths.length) {
+    const { data } = await supabase.storage.from('comprobantes').createSignedUrls(paths, 3600);
+    for (const d of data ?? []) if (d.path && d.signedUrl) signed[d.path] = d.signedUrl;
+  }
+  const out: Record<string, Billing> = {};
+  for (const b of biz.data as { id: string; slug: string; plan: PlanId; paid_plan: PlanId | null; paid_until: string | null }[]) {
+    out[b.slug] = {
+      plan: b.paid_plan ?? b.plan,
+      paidUntil: b.paid_until ?? undefined,
+      payments: rows
+        .filter((r) => r.business_id === b.id)
+        .map((r) => ({
+          id: r.id, plan: r.plan, months: r.months, amount: Number(r.amount), method: r.method, reference: r.reference ?? undefined,
+          receipt: r.receipt_path ? signed[r.receipt_path] : undefined, status: r.status, createdAt: new Date(r.created_at).getTime(), periodEnd: r.period_end ?? undefined,
+        })),
+    };
+  }
+  return out;
 }

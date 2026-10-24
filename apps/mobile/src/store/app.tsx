@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { OPENING_ADS, type OpeningAd } from '@/data/ads';
 import { BUSINESSES, INCOMING_REQUESTS, INITIAL_ORDERS, MY_BUSINESS_SLUG, POSTS, PROMOTIONS, QUESTIONS } from '@/data/mock';
-import { loadAccount, loadCommunity, remote, saveBusiness, type AccountData } from '@/data/remote';
+import { addMonths, demoBilling, isoDate, parseDate, today, type Billing, type PlanId, type SubPayment } from '@/data/billing';
+import { loadAccount, loadBilling, loadCommunity, remote, saveBusiness, type AccountData } from '@/data/remote';
 import { track } from '@/lib/analytics';
 import { uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
@@ -116,6 +117,8 @@ type State = {
   reportedByMe: string[];
   /** Campañas globales a las que se sumó el profesional */
   joinedCampaigns: string[];
+  /** Mensualidad de cada negocio (por slug) */
+  billing: Record<string, Billing>;
   replies: Record<string, string>;
   myAds: AdCampaign[];
   myPromotions: MyPromotion[];
@@ -194,6 +197,7 @@ const initialState: State = {
   blocked: [],
   reportedByMe: [],
   joinedCampaigns: [],
+  billing: online ? {} : demoBilling(BUSINESSES.map((b) => b.slug)),
   myAds: [],
   myPromotions: online ? [] : [{ id: 'mp1', title: 'Primera consulta en línea a $350', target: 'Clientes nuevos', reach: 412, redemptions: 38, active: true }],
   supplyRequests: [
@@ -324,7 +328,15 @@ function useAppState() {
     [update],
   );
 
-  const refreshAccount = useCallback(async () => applyAccount(await loadAccount()), [applyAccount]);
+  const refreshBilling = useCallback(async () => {
+    const billing = await loadBilling();
+    if (billing) update((s) => ({ ...s, billing }));
+  }, [update]);
+
+  const refreshAccount = useCallback(async () => {
+    applyAccount(await loadAccount());
+    void refreshBilling();
+  }, [applyAccount, refreshBilling]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -598,6 +610,52 @@ function useAppState() {
       },
       addAgenda: (a: { day: string; time: string; who: string; what: string }) => update((s) => ({ ...s, agenda: [...s.agenda, a] })),
       toggleBlocked: (key: string) => update((s) => ({ ...s, blocked: s.blocked.includes(key) ? s.blocked.filter((b) => b !== key) : [...s.blocked, key] })),
+      // ── Mensualidades ──
+      /** El negocio avisa que pagó; queda "por confirmar" hasta que el administrador lo revise */
+      reportSubPayment: (slug: string, p: Omit<SubPayment, 'id' | 'status' | 'createdAt'>) => {
+        const pay: SubPayment = { ...p, id: uid(), status: 'pendiente', createdAt: Date.now() };
+        if (online) void remote.reportSubPayment(slug, pay).then(() => refreshBilling());
+        update((s) => {
+          const b = s.billing[slug] ?? { plan: 'basico' as PlanId, payments: [] };
+          return { ...s, billing: { ...s.billing, [slug]: { ...b, payments: [pay, ...b.payments] } } };
+        });
+      },
+      /** Administrador: confirma el pago y recorre la fecha "pagado hasta" */
+      confirmSubPayment: (slug: string, paymentId: string) => {
+        if (online) void remote.confirmSubPayment(paymentId).then(() => refreshBilling());
+        update((s) => {
+          const b = s.billing[slug];
+          const p = b?.payments.find((x) => x.id === paymentId);
+          if (!b || !p) return s;
+          const start = b.paidUntil && parseDate(b.paidUntil) > today() ? parseDate(b.paidUntil) : today();
+          const end = isoDate(addMonths(start, p.months));
+          const payments = b.payments.map((x) => (x.id === paymentId ? { ...x, status: 'pagado' as const, periodEnd: end } : x));
+          return { ...s, billing: { ...s.billing, [slug]: { plan: p.plan, paidUntil: end, payments } } };
+        });
+      },
+      rejectSubPayment: (slug: string, paymentId: string) => {
+        if (online) void remote.rejectSubPayment(paymentId).then(() => refreshBilling());
+        update((s) => {
+          const b = s.billing[slug];
+          if (!b) return s;
+          return { ...s, billing: { ...s.billing, [slug]: { ...b, payments: b.payments.map((x) => (x.id === paymentId ? { ...x, status: 'rechazado' as const } : x)) } } };
+        });
+      },
+      /** Administrador: registra un pago que recibió directo (efectivo, depósito) y lo da por bueno */
+      registerSubPayment: (slug: string, plan: PlanId, months: number, amount: number, method: SubPayment['method']) => {
+        if (online) {
+          void remote.adminRegisterSubPayment(slug, { plan, months, amount, method }).then(() => refreshBilling());
+          return;
+        }
+        update((s) => {
+          const b = s.billing[slug] ?? { plan, payments: [] };
+          const start = b.paidUntil && parseDate(b.paidUntil) > today() ? parseDate(b.paidUntil) : today();
+          const end = isoDate(addMonths(start, months));
+          const pay: SubPayment = { id: uid(), plan, months, amount, method, reference: 'Registrado por el administrador', status: 'pagado', createdAt: Date.now(), periodEnd: end };
+          return { ...s, billing: { ...s.billing, [slug]: { plan, paidUntil: end, payments: [pay, ...b.payments] } } };
+        });
+      },
+      refreshBilling,
       toggleCampaign: (id: string) =>
         update((s) => ({ ...s, joinedCampaigns: s.joinedCampaigns.includes(id) ? s.joinedCampaigns.filter((c) => c !== id) : [...s.joinedCampaigns, id] })),
       reportReview: (reviewId: string) => update((s) => ({ ...s, reportedByMe: s.reportedByMe.includes(reviewId) ? s.reportedByMe : [...s.reportedByMe, reviewId] })),
@@ -628,7 +686,7 @@ function useAppState() {
       setWeight: (key: keyof State['feedWeights'], value: number) =>
         update((s) => ({ ...s, feedWeights: { ...s.feedWeights, [key]: Math.max(0, Math.min(100, value)) } })),
     }),
-    [update, refreshAccount, refreshCommunity],
+    [update, refreshAccount, refreshCommunity, refreshBilling],
   );
 
   return { state, actions };

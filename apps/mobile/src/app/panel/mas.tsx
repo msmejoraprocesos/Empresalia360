@@ -5,6 +5,7 @@ import { Card, Header, ListRow } from '@/components/ui';
 import { Brand, TabBarSpace } from '@/constants/theme';
 import { signOut } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { billingStatus, planById, STATUS_UI } from '@/data/billing';
 import { myBusiness, useApp } from '@/store/app';
 
 export default function Mas() {
@@ -33,6 +34,17 @@ export default function Mas() {
         <Card style={{ paddingVertical: 4 }}>
           <ListRow icon="person-circle-outline" iconBg={Brand.chileSoft} iconColor={Brand.chileDark} title="Editar perfil y especialidades" subtitle={myBusiness.specialties.join(', ') || 'Agrega tus especialidades'} onPress={() => router.push('/mi-negocio/perfil')} />
           <ListRow icon="eye-outline" iconBg={Brand.line} title="Ver mi perfil público" subtitle="Así te ven tus clientes" onPress={() => router.push(`/negocio/${myBusiness.slug}`)} />
+          <ListRow
+            icon="ribbon-outline"
+            iconBg={Brand.mangoSoft}
+            iconColor="#7A5600"
+            title="Mi plan y mensualidad"
+            subtitle={(() => {
+              const bill = state.billing[myBusiness.slug];
+              return bill ? `${planById(bill.plan).name} · ${STATUS_UI[billingStatus(bill)].label}` : 'Básico · gratis';
+            })()}
+            onPress={() => router.push('/mi-negocio/plan')}
+          />
           <ListRow icon="briefcase-outline" iconBg={Brand.nopalSoft} iconColor={Brand.nopalDark} title="Servicios y precios" subtitle={`${state.myItems.length} servicios`} onPress={() => router.push('/mi-negocio/productos')} />
           <ListRow icon="calendar-outline" iconBg={Brand.albercaSoft} iconColor="#1757B8" title="Agenda" subtitle="Citas y horarios" onPress={() => router.push('/mi-negocio/agenda')} />
           <ListRow icon="people-outline" iconBg={Brand.jacarandaSoft} iconColor={Brand.jacaranda} title="Clientes y lealtad" subtitle="Clientes frecuentes y tarjeta de sellos" onPress={() => router.push('/mi-negocio/clientes')} last />

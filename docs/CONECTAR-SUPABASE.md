@@ -89,6 +89,22 @@ Como administrador puedes:
   update business_claims set status = 'aprobada' where id = '...';
   ```
 
+## 6. Mensualidades automáticas
+
+1. **Antes de correr `setup.sql`:** en **Database → Extensions** busca `pg_cron` y actívalo. Esto programa la revisión diaria a las 6:00.
+   - Si ya corriste `setup.sql` sin activarla, actívala y corre esto en el SQL Editor:
+     ```sql
+     select cron.schedule('expertalia-mensualidades', '0 12 * * *', 'select public.refresh_billing()');
+     ```
+2. **Tus datos de cobro:** pon tu banco, CLABE y titular en `apps/mobile/src/constants/contacto.ts` (`COBRO_EXPERTALIA`). Es lo que ven los negocios al pagar. También puedes mandármelos y yo los pongo.
+3. **Cómo funciona:**
+   - El negocio paga y avisa desde **Más → Mi plan**, con su comprobante.
+   - Tú lo confirmas en **Admin → Mensualidades** y su fecha se recorre sola.
+   - Todos los días la base revisa a todos los negocios:
+     - A 5 días de vencer, el negocio ve un aviso para pagar.
+     - Ya vencido, tiene 7 días de gracia.
+     - Pasados los 7 días, baja a Básico (sigue visible, pero sin los beneficios de su plan).
+
 ## Qué cambia en la app al conectarla
 
 | | Sin Supabase (hoy) | Con Supabase |

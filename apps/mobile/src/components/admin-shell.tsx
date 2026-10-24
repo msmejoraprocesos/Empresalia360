@@ -5,17 +5,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/brand-logo';
 import { Brand, Radius } from '@/constants/theme';
+import { billingStatus } from '@/data/billing';
 import { useApp } from '@/store/app';
 
-const NAV: { href: string; label: string; badge?: 'negocios' | 'moderacion' | 'campanas' }[] = [
+const NAV: { href: string; label: string; badge?: 'negocios' | 'moderacion' | 'campanas' | 'mensualidades' }[] = [
   { href: '/admin', label: 'Resumen' },
+  { href: '/admin/cobros', label: 'Mensualidades', badge: 'mensualidades' },
   { href: '/admin/negocios', label: 'Negocios', badge: 'negocios' },
   { href: '/admin/moderacion', label: 'Moderación', badge: 'moderacion' },
   { href: '/admin/publicidad', label: 'Publicidad', badge: 'campanas' },
   { href: '/admin/promociones', label: 'Promociones globales' },
   { href: '/admin/notificaciones', label: 'Notificaciones' },
   { href: '/admin/algoritmo', label: 'Algoritmo del inicio' },
-  { href: '/admin/cobros', label: 'Planes y cobros' },
 ];
 
 /** Marco del panel de administración: barra lateral en pantallas anchas, menú horizontal en el teléfono. */
@@ -30,6 +31,8 @@ export function AdminShell({ title, subtitle, children, action }: { title: strin
     negocios: state.pendingBusinesses.length,
     moderacion: state.reportedReviews.length,
     campanas: state.campaigns.filter((c) => c.status === 'en_revision').length,
+    // Pagos por confirmar + negocios vencidos
+    mensualidades: Object.values(state.billing).filter((b) => b.payments.some((p) => p.status === 'pendiente') || ['vencido', 'suspendido'].includes(billingStatus(b))).length,
   };
 
   const nav = NAV.map((n) => {

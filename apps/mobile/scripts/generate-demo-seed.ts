@@ -10,6 +10,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { OPENING_ADS } from '../src/data/ads';
+import { demoBilling } from '../src/data/billing';
 import { BUSINESSES, CATEGORIES, POSTS, QUESTIONS, ZONE } from '../src/data/mock';
 
 const q = (v: string | number | boolean | undefined | null): string =>
@@ -70,6 +71,8 @@ const out: string[] = [
   '',
 ];
 
+const BILLING = demoBilling(BUSINESSES.map((b) => b.slug));
+
 for (const b of BUSINESSES) {
   out.push(
     `insert into public.businesses (name, slug, subtitle, description, category_id, zone_id, phone, whatsapp, address, location, is_open, accepts_orders, delivers, plan, status, verified, promo,`,
@@ -117,6 +120,19 @@ for (const b of BUSINESSES) {
   }
   // La calificación de ejemplo se respeta (las reseñas de ejemplo son solo una muestra)
   out.push(`update public.businesses set rating_avg = ${b.rating.toFixed(1)}, rating_count = ${b.ratingCount}, verified = ${b.verified} where slug = ${q(b.slug)};`);
+  // Mensualidad de ejemplo: fecha relativa a hoy, para ver cada caso (al corriente, por vencer, vencido…)
+  const bill = BILLING[b.slug];
+  const off = bill.paidUntil ? Math.round((new Date(`${bill.paidUntil}T00:00:00`).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000) : null;
+  out.push(
+    off === null
+      ? `update public.businesses set plan = 'basico', paid_plan = null, paid_until = null, plan_status = 'gratis' where slug = ${q(b.slug)};`
+      : `update public.businesses set plan = ${q(bill.plan)}, paid_plan = ${q(bill.plan)}, paid_until = current_date + ${off}, plan_status = public.billing_status(${q(bill.plan)}, current_date + ${off}) where slug = ${q(b.slug)};`,
+  );
+  for (const p of bill.payments) {
+    out.push(
+      `insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select ${bid}, ${q(p.plan)}, ${p.months}, ${p.amount}, ${q(p.method)}, ${q(p.reference)}, ${q(p.status)}, ${p.status === 'pagado' && off !== null ? `current_date + ${off}` : 'null'}, now() - interval '${Math.max(0, Math.round((Date.now() - p.createdAt) / 3600000))} hours', null where not exists (select 1 from public.subscription_payments where business_id = ${bid} and reference = ${q(p.reference)});`,
+    );
+  }
   out.push('');
 }
 

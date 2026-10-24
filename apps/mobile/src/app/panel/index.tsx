@@ -11,6 +11,8 @@ import { ATTEND_LABEL, categoryBySlug, profileCompleteness } from '@/data';
 import type { IconName } from '@/data/types';
 import { useBusinessStats } from '@/hooks/use-business-stats';
 import { money } from '@/lib/format';
+import { Emoji } from '@/components/emoji';
+import { billingStatus, daysLeft, DIAS_GRACIA, planById } from '@/data/billing';
 import { myBusiness, useApp } from '@/store/app';
 
 export default function ProfesionalInicio() {
@@ -66,6 +68,33 @@ export default function ProfesionalInicio() {
             </View>
           </View>
         </View>
+
+        {(() => {
+          // Aviso de mensualidad: por vencer (amarillo), vencido o suspendido (rojo), en revisión (azul)
+          const bill = state.billing[myBusiness.slug];
+          if (!bill) return null;
+          const st = billingStatus(bill);
+          const pend = bill.payments.some((p) => p.status === 'pendiente');
+          if (!pend && !['por_vencer', 'vencido', 'suspendido'].includes(st)) return null;
+          const left = daysLeft(bill.paidUntil);
+          const red = !pend && st !== 'por_vencer';
+          const text = pend
+            ? 'Recibimos tu aviso de pago. Lo confirmamos pronto.'
+            : st === 'por_vencer'
+              ? `Tu plan ${planById(bill.plan).name} vence ${left === 0 ? 'hoy' : `en ${left} días`}. Toca para pagar.`
+              : st === 'vencido'
+                ? `Tu plan venció. Tienes ${DIAS_GRACIA + left} días antes de bajar a Básico. Toca para pagar.`
+                : 'Bajaste a Básico por falta de pago. Toca para regresar a tu plan.';
+          return (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/mi-negocio/plan')}
+              style={[styles.billBanner, { backgroundColor: pend ? '#E3ECFB' : red ? '#FDE2E2' : '#FFF1CC', borderColor: pend ? '#9DB8E8' : red ? '#E39A9A' : '#F0D58C' }]}>
+              <Emoji name={pend ? 'reloj' : red ? 'sirena' : 'calendario'} size={30} />
+              <Text style={[styles.billText, { color: pend ? '#1B3F7A' : red ? '#8A1B1B' : '#6B4A00' }]}>{text}</Text>
+            </Pressable>
+          );
+        })()}
 
         <Pressable onPress={() => router.push('/mi-negocio/perfil')} accessibilityRole="button" style={[styles.profileCard, ShadowStrong]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -168,6 +197,8 @@ export default function ProfesionalInicio() {
 }
 
 const styles = StyleSheet.create({
+  billBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 16, borderWidth: 1 },
+  billText: { flex: 1, fontSize: 14, fontWeight: '700', lineHeight: 19 },
   header: { backgroundColor: Brand.ink, paddingHorizontal: 20, paddingBottom: 54, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
   bizName: { color: Brand.white, fontSize: 19, fontWeight: '800' },
   darkMuted: { color: '#B7C1D3', fontSize: 12 },
