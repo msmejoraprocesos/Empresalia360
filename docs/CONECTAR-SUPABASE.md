@@ -30,6 +30,14 @@ Esto crea:
 
 Córrelo **una sola vez**, en un proyecto nuevo.
 
+### ¿Ya tenías la base? Revisa qué le falta
+
+Pega `supabase/verificar.sql` en el SQL Editor y dale **Run**. No cambia nada: te dice archivo por archivo si está ✅ completo o ❌ qué le falta.
+
+- Si algún archivo sale ❌, corre **ese archivo y todos los que le siguen, en orden** (están en `supabase/migrations`). Se pueden volver a correr sin perder datos.
+- No corras uno viejo después de uno nuevo: algunos actualizan las mismas reglas y el viejo las regresaría a la versión anterior. Si te pasa, vuelve a correr los nuevos.
+- No vuelvas a correr `setup.sql` completo en una base que ya existe: el primer archivo marca error porque las tablas ya están.
+
 ## 3. Correo de acceso (código de 6 números)
 
 La app no usa contraseñas: la persona escribe su correo, le llega un código y lo escribe en la app.
