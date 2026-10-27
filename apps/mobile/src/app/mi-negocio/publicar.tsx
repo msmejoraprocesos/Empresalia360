@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PostCard } from '@/components/community-feed';
+import { PlanLock, useMyPlan } from '@/components/plan-lock';
 import { BottomBar, Button, Field, Header } from '@/components/ui';
 import { Brand, Radius } from '@/constants/theme';
 import type { Post } from '@/data/types';
@@ -19,6 +20,7 @@ export default function Publicar() {
   const router = useRouter();
   const { actions } = useApp();
   const gate = useLoginGate();
+  const plan = useMyPlan();
   const [kind, setKind] = useState<Post['kind']>('servicio');
   const [specialty, setSpecialty] = useState<string | undefined>(myBusiness.specialties[0]);
   const [title, setTitle] = useState('');
@@ -40,6 +42,17 @@ export default function Publicar() {
     comments: [],
   };
   const valid = title.trim().length > 4 && body.trim().length > 10;
+
+  if (plan === 'estandar') {
+    return (
+      <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
+        <Header title="Publicar en la comunidad" subtitle="Lo ven clientes de tu zona" color={Brand.ink} />
+        <View style={{ padding: 16 }}>
+          <PlanLock need="premium" title="Publica en el muro" text="Anuncia tus servicios, comparte consejos y eventos con los clientes de tu zona. Es parte de Premium y VIP." />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>

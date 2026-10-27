@@ -156,6 +156,8 @@ export type Business = {
   warranty?: string;
   /** Datos para que le paguen por transferencia: banco, CLABE y titular. Solo se mandan al cliente que contrata. */
   paymentInfo?: string;
+  /** Lo dio de alta el administrador y todavía no tiene dueño: muestra "¿Eres tú? Reclama este perfil" */
+  claimable?: boolean;
   modules: Module[];
   delivers: boolean;
   verified: boolean;

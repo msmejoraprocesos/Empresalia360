@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
+import { LIMITS, PlanLock, useMyPlan } from '@/components/plan-lock';
 import { BottomBar, Button, Card, EmptyState, Header } from '@/components/ui';
 import { Brand } from '@/constants/theme';
 import { useApp } from '@/store/app';
@@ -17,11 +18,21 @@ export default function Promociones() {
   const router = useRouter();
   const { state, actions } = useApp();
   const [showCampaigns, setShowCampaigns] = useState(false);
+  const plan = useMyPlan();
+  const active = state.myPromotions.filter((p) => p.active).length;
+  // Estándar: sin promociones. Premium: hasta 3 activas. VIP: ilimitadas.
+  const locked = plan === 'estandar' || (plan === 'premium' && active >= LIMITS.promociones);
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
       <Header title="Promociones" color={Brand.ink} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 130 }}>
+        {plan === 'estandar' ? (
+          <PlanLock need="premium" title="Crea promociones" text="Con Premium haces hasta 3 promociones al mes y te sumas a las campañas de la zona. Con VIP, ilimitadas." />
+        ) : plan === 'premium' && locked ? (
+          <PlanLock need="vip" title="Ya tienes 3 promociones activas" text="Apaga una para crear otra, o sube a VIP para tener promociones ilimitadas." />
+        ) : null}
+        {plan !== 'estandar' ? (
         <Card style={{ backgroundColor: Brand.mangoSoft }}>
           <Text style={{ fontWeight: '800', color: '#5A3E00' }}>Promociones globales de Expertalia 360</Text>
           <Text style={{ color: '#5A3E00', marginTop: 4, fontSize: 13 }}>Súmate a la Temporada de declaraciones o al Buen Fin profesional y aparece en el inicio de toda tu zona.</Text>
@@ -45,6 +56,7 @@ export default function Promociones() {
             <Button label="Ver campañas abiertas" variant="dark" small style={{ marginTop: 10, alignSelf: 'flex-start' }} onPress={() => setShowCampaigns(true)} />
           )}
         </Card>
+        ) : null}
         {state.myPromotions.map((p) => (
           <Card key={p.id} style={{ gap: 8 }}>
             {p.photo ? <Image source={{ uri: p.photo }} style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 14 }} contentFit="cover" accessibilityLabel={p.title} /> : null}
@@ -70,7 +82,7 @@ export default function Promociones() {
         {state.myPromotions.length === 0 ? <EmptyState icon="pricetag-outline" title="Sin promociones" text="Crea una para que tus clientes regresen." /> : null}
       </ScrollView>
       <BottomBar>
-        <Button label="Nueva promoción" icon="add" onPress={() => router.push('/mi-negocio/promocion-nueva')} />
+        <Button label={locked ? 'Llegaste al límite de tu plan' : 'Nueva promoción'} icon="add" disabled={locked} onPress={() => router.push('/mi-negocio/promocion-nueva')} />
       </BottomBar>
     </View>
   );

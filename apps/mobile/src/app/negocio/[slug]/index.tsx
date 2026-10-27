@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ATTEND_EMOJI, consultLabel, ProAvatar, Tag } from '@/components/business-card';
 import { Emoji } from '@/components/emoji';
+import { ClaimCard } from '@/components/claim-card';
 import { SpeakButton } from '@/components/speak-button';
 import { BusinessMap } from '@/components/business-map';
 import { PostCard } from '@/components/community-feed';
@@ -331,6 +332,8 @@ export default function PerfilProfesional() {
               <EmptyState icon="megaphone-outline" title="Sin publicaciones" text="Aquí aparecen los servicios, consejos y eventos que publica en la comunidad." />
             )
           ) : null}
+
+          {b.claimable ? <ClaimCard business={b} /> : null}
         </View>
       </ScrollView>
 

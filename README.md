@@ -18,6 +18,7 @@ Está pensada para que se entienda sin leer: dibujos a color, botones grandes, l
 | `apps/mobile/src/constants/supabase.ts` | **Las dos llaves de Supabase** (único lugar a llenar) |
 | `supabase/migrations` | Esquema: Postgres + PostGIS, RLS en todas las tablas |
 | `supabase/seed.sql` · `seed_demo.sql` | Zonas, categorías y especialidades · expertos, muro y preguntas de ejemplo |
+| `supabase/functions` | Funciones del servidor: cobro con tarjeta (Mercado Pago), su aviso de pago y correos de mensualidades · `functions-pegar/` las trae en un solo archivo para pegarlas en Supabase |
 | `supabase/setup.sql` | Todo junto para pegar una vez en el SQL Editor (`bash supabase/build-setup.sh` lo regenera) |
 | `web/` | Íconos, manifiesto, service worker y el script que publica la app web |
 | `docs/CONECTAR-SUPABASE.md` | **Guía paso a paso para conectar Supabase** |

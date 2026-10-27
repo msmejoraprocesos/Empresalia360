@@ -11,8 +11,8 @@ def to_data(m):
     return '"data:%s;base64,%s"' % (mime, base64.b64encode(open(f, 'rb').read()).decode())
 
 MH = """window.__MH=(function(){var O='https://expertalia360.app',st=[{s:null,p:(function(){
-/* Ligas directas: ?p=<experto> abre su página; &r=1 abre sus reseñas para calificar */
-try{var q=new URLSearchParams(location.search),p=q.get('p');if(p&&/^[a-z0-9-]+$/.test(p))return q.get('r')?'/negocio/'+p+'/resenas?escribir=1':'/n/'+p}catch(e){}return'/'})()}],i=0;
+/* Ligas directas: ?p=<experto> abre su página; &r=1 abre sus reseñas para calificar; ?plan=1 abre Mi plan (regreso de Mercado Pago) */
+try{var q=new URLSearchParams(location.search),p=q.get('p');if(p&&/^[a-z0-9-]+$/.test(p))return q.get('r')?'/negocio/'+p+'/resenas?escribir=1':'/n/'+p;if(q.get('plan'))return'/mi-negocio/plan?mp=1'}catch(e){}return'/'})()}],i=0;
 function norm(u){var x=new URL(String(u),O+st[i].p);return x.pathname+x.search+x.hash}
 function fire(){try{window.dispatchEvent(new PopStateEvent('popstate',{state:st[i].s}))}catch(e){}}
 return{origin:O,get state(){return st[i].s},

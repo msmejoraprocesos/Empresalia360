@@ -24,6 +24,7 @@ import {
   type BillingStatus,
   type PlanId,
   type SubPayment,
+  type World,
 } from '@/data/billing';
 import { money } from '@/lib/format';
 import { openWhatsApp } from '@/lib/links';
@@ -53,18 +54,34 @@ export default function AdminMensualidades() {
   const { state, actions } = useApp();
   const [tab, setTab] = useState<Tab>('confirmar');
   const [registering, setRegistering] = useState<string | null>(null);
+  const [mundo, setMundo] = useState<'todos' | World>('todos');
 
-  const rows = BUSINESSES.map((b) => {
+  const allRows = BUSINESSES.map((b) => {
     const bill = state.billing[b.slug] ?? { plan: 'estandar' as PlanId, payments: [] };
     const world = worldOf(b.categorySlug);
     return { b, bill, st: billingStatus(bill), world, price: planPrice(bill.plan, world) };
   });
+  // Profesionistas y oficios se cobran distinto: cada mundo con sus propios números
+  const rows = mundo === 'todos' ? allRows : allRows.filter((r) => r.world === mundo);
   const count = (t: Tab) => rows.filter((r) => inTab(t, r.bill, r.st)).length;
   const now = new Date();
+  const thisMonth = (p: SubPayment) => p.status === 'pagado' && new Date(p.createdAt).getMonth() === now.getMonth() && new Date(p.createdAt).getFullYear() === now.getFullYear();
   const paidThisMonth = rows
     .flatMap((r) => r.bill.payments)
-    .filter((p) => p.status === 'pagado' && new Date(p.createdAt).getMonth() === now.getMonth() && new Date(p.createdAt).getFullYear() === now.getFullYear())
+    .filter(thisMonth)
     .reduce((a, p) => a + p.amount, 0);
+  const byWorld = (w: World) => {
+    const rs = allRows.filter((r) => r.world === w);
+    return {
+      negocios: rs.length,
+      pagando: rs.filter((r) => r.st !== 'suspendido' && r.st !== 'prueba').length,
+      cobrado: rs.flatMap((r) => r.bill.payments).filter(thisMonth).reduce((a, p) => a + p.amount, 0),
+      mensual: rs.filter((r) => r.st !== 'suspendido' && r.st !== 'prueba').reduce((a, r) => a + r.price, 0),
+      vencidos: rs.filter((r) => r.st === 'vencido' || r.st === 'suspendido').length,
+      confirmar: rs.filter((r) => r.bill.payments.some((p) => p.status === 'pendiente')).length,
+      auto: rs.filter((r) => r.bill.auto === 'activo').length,
+    };
+  };
   const pending = rows.flatMap((r) => r.bill.payments.filter((p) => p.status === 'pendiente'));
   const mrr = rows.filter((r) => r.st !== 'suspendido' && r.st !== 'prueba').reduce((a, r) => a + r.price, 0);
   const overdue = rows.filter((r) => r.st === 'vencido' || r.st === 'suspendido');
@@ -73,6 +90,41 @@ export default function AdminMensualidades() {
 
   return (
     <AdminShell title="Mensualidades" subtitle="Quién pagó, quién debe y quién avisó que ya pagó">
+      <View style={styles.kpis}>
+        {(['profesionales', 'oficios'] as World[]).map((w) => {
+          const d = byWorld(w);
+          const on = mundo === w;
+          return (
+            <Pressable
+              key={w}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              onPress={() => setMundo(on ? 'todos' : w)}
+              style={[styles.world, { borderColor: on ? (w === 'oficios' ? '#8A3F0E' : '#1F3A68') : Brand.line }, on && { backgroundColor: w === 'oficios' ? '#FBEADF' : '#E3ECFB' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={[styles.name, { fontSize: 17 }]}>{w === 'oficios' ? '🔧 Oficios' : '🎓 Profesionistas'}</Text>
+                <Text style={styles.small}>{on ? 'Viendo solo este mundo · tocar para ver todos' : 'Tocar para ver solo estos'}</Text>
+              </View>
+              <View style={styles.worldGrid}>
+                <Mini label="Cobrado este mes" value={money(d.cobrado)} />
+                <Mini label="Ingreso mensual" value={money(d.mensual)} />
+                <Mini label="Pagando" value={`${d.pagando} de ${d.negocios}`} />
+                <Mini label="Por confirmar" value={String(d.confirmar)} warn={d.confirmar > 0} />
+                <Mini label="Vencidos" value={String(d.vencidos)} bad={d.vencidos > 0} />
+                <Mini label="Con tarjeta automática" value={String(d.auto)} />
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={styles.tabs}>
+        {([['todos', 'Todos'], ['profesionales', 'Profesionistas'], ['oficios', 'Oficios']] as const).map(([id, label]) => (
+          <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected: mundo === id }} onPress={() => setMundo(id)} style={[styles.tab, mundo === id && styles.tabOn]}>
+            <Text style={[styles.tabText, mundo === id && { color: Brand.white }]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.sub}>{mundo === 'todos' ? 'Totales de los dos mundos' : `Solo ${mundo === 'oficios' ? 'oficios' : 'profesionistas'}`}</Text>
       <View style={styles.kpis}>
         <Kpi label="Cobrado este mes" value={money(paidThisMonth)} tone="ok" />
         <Kpi label="Ingreso mensual de planes" value={money(mrr)} />
@@ -126,7 +178,10 @@ export default function AdminMensualidades() {
                   </Text>
                 ) : null}
               </View>
-              <Chip label={ui.label} color={ui.bg} ink={ui.fg} />
+              <View style={{ gap: 6, alignItems: 'flex-end' }}>
+                <Chip label={ui.label} color={ui.bg} ink={ui.fg} />
+                {bill.auto === 'activo' ? <Chip label="💳 Tarjeta automática" color="#E3ECFB" ink="#1B3F7A" /> : null}
+              </View>
             </View>
 
             {pend.map((p) => (
@@ -185,6 +240,8 @@ export default function AdminMensualidades() {
         <Text style={styles.rule}>• Se le pasó la fecha: queda “Vencido” con {DIAS_GRACIA} días de gracia; sigue con su plan y el aviso se vuelve rojo.</Text>
         <Text style={styles.rule}>• Pasan los {DIAS_GRACIA} días: su perfil se oculta del directorio (búsquedas, categorías y mapa). Sus datos y reseñas se guardan.</Text>
         <Text style={styles.rule}>• Quien se registra tiene {DIAS_PRUEBA} días de prueba; al terminar, si no paga, sigue las mismas reglas.</Text>
+        <Text style={styles.rule}>• Paga con tarjeta (Mercado Pago): se le cobra solo cada mes y la fecha se recorre sola, sin que confirmes nada.</Text>
+        <Text style={styles.rule}>• Le llega correo 5 días antes, el día que vence y cuando su perfil se oculta. A ti te llega un resumen diario.</Text>
         <Text style={styles.rule}>• Avisa que pagó: te aparece en “Por confirmar” con su comprobante. Al confirmar, la fecha se recorre sola y vuelve a aparecer.</Text>
       </AdminCard>
 
@@ -233,6 +290,15 @@ function Pending({ p, onConfirm, onReject }: { p: SubPayment; onConfirm: () => v
   );
 }
 
+function Mini({ label, value, warn, bad }: { label: string; value: string; warn?: boolean; bad?: boolean }) {
+  return (
+    <View style={{ flexGrow: 1, flexBasis: 120 }}>
+      <Text style={styles.small}>{label}</Text>
+      <Text style={[styles.kpi, { fontSize: 18 }, warn && { color: '#7A5600' }, bad && { color: '#A32020' }]}>{value}</Text>
+    </View>
+  );
+}
+
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'warn' | 'bad' }) {
   const bg = tone === 'ok' ? '#DDF3E8' : tone === 'warn' ? '#FFF1CC' : tone === 'bad' ? '#FDE2E2' : Brand.white;
   return (
@@ -259,5 +325,7 @@ const styles = StyleSheet.create({
   pending: { backgroundColor: '#FFF7E0', borderRadius: Radius.md, padding: 12, gap: 10, borderWidth: 1, borderColor: '#F0D58C' },
   receipt: { width: 64, height: 64, borderRadius: 10, backgroundColor: Brand.line },
   register: { backgroundColor: Brand.tortilla, borderRadius: Radius.md, padding: 12, gap: 8 },
+  world: { flexGrow: 1, flexBasis: 320, backgroundColor: Brand.white, borderRadius: 18, borderWidth: 2, padding: 16, gap: 10 },
+  worldGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 10, columnGap: 12 },
   rule: { fontSize: 13, color: '#E3E8EF', lineHeight: 19 },
 });

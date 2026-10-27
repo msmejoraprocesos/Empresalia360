@@ -1054,6 +1054,9 @@ for (const b of BUSINESSES) {
   }
 }
 
+// Ejemplo de perfil que dio de alta el administrador y aún no reclama su dueño
+for (const b of BUSINESSES) if (b.slug === 'cerrajeria-llave-maestra') b.claimable = true;
+
 export function categoryBySlug(slug: string): Category | undefined {
   return CATEGORIES.find((c) => c.slug === slug);
 }

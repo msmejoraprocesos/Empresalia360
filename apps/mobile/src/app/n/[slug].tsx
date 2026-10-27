@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ClaimCard } from '@/components/claim-card';
 import { EmptyState, RoundIconButton } from '@/components/ui';
 import { Brand, Radius } from '@/constants/theme';
 import { categoryBySlug, getBusiness } from '@/data';
@@ -82,6 +83,12 @@ export default function MiniSitio() {
         <View style={styles.promo}>
           <Text style={{ fontSize: 11, fontWeight: '800', color: '#4A3608', letterSpacing: 0.4 }}>PROMO</Text>
           <Text style={{ fontSize: 15, fontWeight: '800', color: '#4A3608', marginTop: 2 }}>{b.promo}</Text>
+        </View>
+      ) : null}
+
+      {b.claimable ? (
+        <View style={{ marginTop: 18 }}>
+          <ClaimCard business={b} />
         </View>
       ) : null}
 

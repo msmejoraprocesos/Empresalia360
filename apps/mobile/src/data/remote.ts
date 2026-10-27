@@ -40,6 +40,7 @@ type Row = {
   logo_url: string | null;
   cover_url: string | null;
   available: boolean | null;
+  owner_id: string | null;
   business_photos: { id: string; url: string | null; caption: string; color: string | null; position: number }[];
   categories: { slug: string } | null;
   zones: { name: string } | null;
@@ -66,7 +67,7 @@ const SELECT = `
   id, slug, name, subtitle, description, address, phone, whatsapp, is_open, delivers, verified, promo,
   rating_avg, rating_count, lat, lng,
   profession, specialties, extra_categories, plan, years_exp, license, education, languages, attends, consult_price, response_time,
-  directions, urgent24, warranty, payment_info, logo_url, cover_url, available,
+  directions, urgent24, warranty, payment_info, logo_url, cover_url, available, owner_id,
   business_photos ( id, url, caption, color, position ),
   categories ( slug ),
   zones ( name ),
@@ -139,6 +140,7 @@ function toBusiness(r: Row): Business {
     urgent24: Boolean(r.urgent24),
     warranty: r.warranty ?? undefined,
     paymentInfo: r.payment_info ?? undefined,
+    claimable: !r.owner_id,
     photo: r.logo_url ?? undefined,
     cover: r.cover_url ?? undefined,
     gallery: [...(r.business_photos ?? [])]
@@ -296,6 +298,8 @@ export type AccountData = {
   email?: string;
   name: string;
   businessSlug: string | null;
+  /** Cuenta de administrador (profiles.role = 'admin') */
+  isAdmin: boolean;
   likedPosts: string[];
   helpfulAnswers: string[];
   /** Citas y cotizaciones que pidió como cliente */
@@ -310,7 +314,7 @@ export async function loadAccount(): Promise<AccountData | null> {
   const user = auth.user;
   if (!user) return null;
   const [profile, slug, likes, helpful, reqs] = await Promise.all([
-    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('full_name, role').eq('id', user.id).maybeSingle(),
     supabase.rpc('my_business_slug'),
     supabase.from('post_likes').select('post_id').eq('user_id', user.id),
     supabase.from('answer_helpful').select('answer_id').eq('user_id', user.id),
@@ -330,6 +334,7 @@ export async function loadAccount(): Promise<AccountData | null> {
     email: user.email ?? undefined,
     name: (profile.data?.full_name as string | null) ?? '',
     businessSlug,
+    isAdmin: profile.data?.role === 'admin',
     likedPosts: (likes.data ?? []).map((l: { post_id: string }) => l.post_id),
     helpfulAnswers: (helpful.data ?? []).map((h: { answer_id: string }) => h.answer_id),
     orders: mine.map((r) => ({
@@ -513,10 +518,11 @@ export const remote = {
     const { error } = await supabase.from('businesses').update(v).eq('id', business.id);
     warn('disponibilidad', error);
   },
-  async claim(business: Business, license?: string) {
+  cancelCard: () => cancelCardSubscription(),
+  async claim(business: Business, license?: string, note?: string) {
     const uid = await userId();
     if (!supabase || !uid || !isUuid(business.id)) return false;
-    const { error } = await supabase.from('business_claims').insert({ business_id: business.id, user_id: uid, license: license ?? null });
+    const { error } = await supabase.from('business_claims').insert({ business_id: business.id, user_id: uid, license: license || null, note: note || null });
     return warn('reclamar perfil', error);
   },
 };
@@ -613,7 +619,7 @@ export async function saveBusiness(current: Business, patch: Partial<Business>, 
 export async function loadBilling(): Promise<Record<string, Billing> | null> {
   if (!supabase) return null;
   const [biz, pays] = await Promise.all([
-    supabase.from('businesses').select('id, slug, plan, paid_plan, paid_until'),
+    supabase.from('businesses').select('id, slug, plan, paid_plan, paid_until, mp_status'),
     supabase
       .from('subscription_payments')
       .select('id, business_id, plan, months, amount, method, reference, receipt_path, status, period_end, created_at')
@@ -630,10 +636,11 @@ export async function loadBilling(): Promise<Record<string, Billing> | null> {
     for (const d of data ?? []) if (d.path && d.signedUrl) signed[d.path] = d.signedUrl;
   }
   const out: Record<string, Billing> = {};
-  for (const b of biz.data as { id: string; slug: string; plan: PlanId; paid_plan: PlanId | null; paid_until: string | null }[]) {
+  for (const b of biz.data as { id: string; slug: string; plan: PlanId; paid_plan: PlanId | null; paid_until: string | null; mp_status: Billing['auto'] | null }[]) {
     out[b.slug] = {
       plan: b.paid_plan ?? b.plan,
       paidUntil: b.paid_until ?? undefined,
+      auto: b.mp_status ?? undefined,
       payments: rows
         .filter((r) => r.business_id === b.id)
         .map((r) => ({
@@ -643,4 +650,114 @@ export async function loadBilling(): Promise<Record<string, Billing> | null> {
     };
   }
   return out;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cobro automático con tarjeta (Mercado Pago, por la función mp-suscripcion)
+// ─────────────────────────────────────────────────────────────
+export async function startCardSubscription(plan: PlanId, email?: string): Promise<{ url?: string; error?: string }> {
+  if (!supabase) return { error: 'Sin conexión' };
+  const { data, error } = await supabase.functions.invoke('mp-suscripcion', { body: { action: 'crear', plan, email } });
+  if (error) {
+    let msg = error.message;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx) msg = ((await ctx.json()) as { error?: string }).error ?? msg;
+    } catch {
+      // se queda el mensaje general
+    }
+    return { error: msg };
+  }
+  return { url: (data as { url?: string }).url };
+}
+
+export async function cancelCardSubscription(): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.functions.invoke('mp-suscripcion', { body: { action: 'cancelar' } });
+  return warn('cancelar tarjeta', error);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Administración: todos los negocios, reclamos de perfil y altas
+// ─────────────────────────────────────────────────────────────
+export type AdminBusiness = {
+  id: string; slug: string; name: string; categorySlug: string; zone: string; verified: boolean; status: 'pendiente' | 'activo' | 'suspendido';
+  license?: string; owner: boolean; byAdmin: boolean; phone?: string; email?: string; createdAt: string; hiddenUnpaid: boolean;
+};
+export type AdminClaim = { id: string; businessId: string; businessSlug: string; businessName: string; userName?: string; userEmail?: string; license?: string; note?: string; status: 'pendiente' | 'aprobada' | 'rechazada'; createdAt: string };
+
+export async function loadAdmin(): Promise<{ businesses: AdminBusiness[]; claims: AdminClaim[] } | null> {
+  if (!supabase) return null;
+  const [biz, claims] = await Promise.all([
+    supabase
+      .from('businesses')
+      .select('id, slug, name, verified, status, license, owner_id, created_by_admin, whatsapp, phone, contact_email, created_at, hidden_unpaid, categories ( slug ), zones ( name )')
+      .order('created_at', { ascending: false }),
+    supabase.rpc('admin_claims'),
+  ]);
+  if (biz.error) {
+    warn('negocios (admin)', biz.error);
+    return null;
+  }
+  type B = { id: string; slug: string; name: string; verified: boolean; status: AdminBusiness['status']; license: string | null; owner_id: string | null; created_by_admin: boolean; whatsapp: string | null; phone: string | null; contact_email: string | null; created_at: string; hidden_unpaid: boolean; categories: { slug: string } | null; zones: { name: string } | null };
+  type C = { id: string; business_id: string; business_slug: string; business_name: string; user_name: string | null; user_email: string | null; license: string | null; note: string | null; status: AdminClaim['status']; created_at: string };
+  return {
+    businesses: (biz.data as unknown as B[]).map((b) => ({
+      id: b.id, slug: b.slug, name: b.name, categorySlug: b.categories?.slug ?? '', zone: b.zones?.name ?? '', verified: b.verified, status: b.status,
+      license: b.license ?? undefined, owner: Boolean(b.owner_id), byAdmin: b.created_by_admin, phone: b.whatsapp ?? b.phone ?? undefined,
+      email: b.contact_email ?? undefined, createdAt: b.created_at, hiddenUnpaid: b.hidden_unpaid,
+    })),
+    claims: ((claims.data as C[] | null) ?? []).map((c) => ({
+      id: c.id, businessId: c.business_id, businessSlug: c.business_slug, businessName: c.business_name, userName: c.user_name ?? undefined,
+      userEmail: c.user_email ?? undefined, license: c.license ?? undefined, note: c.note ?? undefined, status: c.status, createdAt: c.created_at,
+    })),
+  };
+}
+
+export async function adminUpdateBusiness(id: string, patch: { verified?: boolean; status?: AdminBusiness['status'] }) {
+  if (!supabase) return false;
+  const { error } = await supabase.from('businesses').update(patch).eq('id', id);
+  return warn('actualizar negocio', error);
+}
+
+export async function adminResolveClaim(id: string, status: 'aprobada' | 'rechazada') {
+  if (!supabase) return false;
+  const { error } = await supabase.from('business_claims').update({ status }).eq('id', id);
+  return warn('resolver reclamo', error);
+}
+
+export type NewExpert = {
+  name: string; categorySlug: string; profession: string; phone: string; email?: string; zone: string; address?: string;
+  license?: string; specialties: string[]; description?: string; attends: Attend[];
+};
+
+/** Alta hecha por el administrador: perfil sin dueño, con 30 días de prueba, listo para que el experto lo reclame. */
+export async function adminCreateBusiness(f: NewExpert): Promise<{ slug?: string; error?: string }> {
+  if (!supabase) return { error: 'Sin conexión' };
+  const [cat, zone] = await Promise.all([
+    supabase.from('categories').select('id, world').eq('slug', f.categorySlug).maybeSingle(),
+    supabase.from('zones').select('id').eq('name', f.zone).maybeSingle(),
+  ]);
+  const slug = `${slugify(f.name) || 'experto'}-${Math.random().toString(36).slice(2, 6)}`;
+  const trial = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from('businesses')
+    .insert({
+      slug, name: f.name, category_id: cat.data?.id ?? null, zone_id: zone.data?.id ?? null, profession: f.profession, subtitle: f.profession,
+      phone: f.phone, whatsapp: f.phone, contact_email: f.email || null, address: f.address || null, license: f.license || null,
+      specialties: f.specialties, description: f.description || null, attends: f.attends, status: 'activo', owner_id: null,
+      plan: 'estandar', paid_plan: 'estandar', paid_until: trial, plan_status: 'al_corriente', created_by_admin: true,
+      location: `SRID=4326;POINT(${ZONE.lng + (Math.random() - 0.5) * 0.01} ${ZONE.lat + (Math.random() - 0.5) * 0.01})`,
+    })
+    .select('id')
+    .single();
+  if (error || !data) return { error: error?.message ?? 'No se pudo guardar' };
+  const id = data.id as string;
+  const oficio = cat.data?.world === 'oficios';
+  await Promise.all([
+    supabase.from('business_modules').insert(['reservar', 'cotizar', 'consulta'].map((module) => ({ business_id: id, module }))),
+    supabase.from('business_hours').insert([1, 2, 3, 4, 5, 6].map((weekday) => ({ business_id: id, weekday, opens: '09:00', closes: weekday === 6 ? '14:00' : '18:00' }))),
+    supabase.from('catalog_items').insert({ business_id: id, kind: 'cita', section: 'Consultas', name: oficio ? 'Visita de diagnóstico' : 'Consulta inicial', duration_min: 45, position: 0 }),
+  ]);
+  return { slug };
 }

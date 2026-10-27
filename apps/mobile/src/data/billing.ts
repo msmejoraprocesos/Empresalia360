@@ -38,7 +38,7 @@ export type SubPayment = {
   plan: PlanId;
   months: number;
   amount: number;
-  method: PaymentMethod | 'deposito';
+  method: PaymentMethod | 'deposito' | 'mercadopago';
   reference?: string;
   receipt?: string;
   status: 'pendiente' | 'pagado' | 'rechazado';
@@ -50,6 +50,8 @@ export type Billing = {
   /** AAAA-MM-DD hasta donde está pagado (o hasta donde dura su prueba) */
   paidUntil?: string;
   payments: SubPayment[];
+  /** Cobro automático con tarjeta (Mercado Pago): activo = se le cobra solo cada mes */
+  auto?: 'pendiente' | 'activo' | 'pausado' | 'cancelado';
 };
 
 const DAY = 86400000;
@@ -112,7 +114,10 @@ export function demoBilling(list: { slug: string; categorySlug: string }[]): Rec
         : [{ id: `sp-${i}-1`, plan, months: 1, amount: price, method: i % 2 ? 'transferencia' : 'deposito', reference: `SPEI ${7300 + i * 37}`, status: 'pagado', createdAt: addDays(today(), days - 31).getTime(), periodEnd: paidUntil }];
     // Dos negocios ya avisaron que pagaron y esperan tu confirmación
     if (i === 2 || i === 11) payments.unshift({ id: `sp-${i}-2`, plan, months: i === 2 ? 3 : 1, amount: price * (i === 2 ? 3 : 1), method: 'transferencia', reference: `SPEI ${9100 + i}`, status: 'pendiente', createdAt: Date.now() - (i + 2) * 3600000 });
-    out[slug] = { plan, paidUntil, payments };
+    // Algunos ya pagan con tarjeta automática (Mercado Pago)
+    const auto = [0, 5, 9, 13, 16].includes(i);
+    if (auto && payments[0]) payments[0] = { ...payments[0], method: 'mercadopago', reference: 'Cobro automático Mercado Pago' };
+    out[slug] = { plan, paidUntil, payments, auto: auto ? 'activo' : undefined };
   });
   return out;
 }

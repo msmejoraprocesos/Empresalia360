@@ -14,3 +14,4 @@ cd "$(dirname "$0")"
   done
 } > setup.sql
 echo "setup.sql: $(wc -l < setup.sql) líneas"
+python3 build-functions.py > /dev/null && echo "functions-pegar: listas"

@@ -21,7 +21,7 @@ export default function AdminResumen() {
   const total = sources.reduce((a, s) => a + s.value, 0);
 
   const pending = [
-    { text: `${state.pendingBusinesses.length} negocios por aprobar`, href: '/admin/negocios', cta: 'Revisar' },
+    { text: `${state.adminPending ?? state.pendingBusinesses.length} negocios por revisar (reclamos y cédulas)`, href: '/admin/negocios', cta: 'Revisar' },
     { text: `${state.campaigns.filter((c) => c.status === 'en_revision').length} campañas en revisión`, href: '/admin/publicidad', cta: 'Aprobar' },
     { text: `${state.reportedReviews.length} reseñas reportadas`, href: '/admin/moderacion', cta: 'Moderar' },
   ] as const;

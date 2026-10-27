@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { PlanLock, useMyPlan } from '@/components/plan-lock';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -60,8 +61,25 @@ export default function Estadisticas() {
   const [period, setPeriod] = useState<Period>('7');
   const [picked, setPicked] = useState<string>();
   const { stats, source } = useBusinessStats(business, Number(period));
+  const myPlan = useMyPlan();
 
   if (!business || !stats) return <EmptyState icon="stats-chart-outline" title="Negocio no encontrado" text="" />;
+
+  // Las estadísticas completas son de Premium y VIP (el administrador siempre las ve)
+  if (!slug && myPlan === 'estandar') {
+    return (
+      <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
+        <Header title="Estadísticas" subtitle={business.name} color={Brand.ink} />
+        <View style={{ padding: 16, gap: 12 }}>
+          <Card style={{ alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 13, color: Brand.inkSoft }}>Personas que vieron tu perfil en 7 días</Text>
+            <Text style={{ fontSize: 34, fontWeight: '800', color: Brand.ink }}>{stats.visitors}</Text>
+          </Card>
+          <PlanLock need="premium" title="Mira quién te busca y cómo te encuentran" text="Con Premium ves de dónde llegan tus clientes, qué servicios ven, cuántos te escriben por WhatsApp y cómo vas contra la semana pasada." />
+        </View>
+      </View>
+    );
+  }
 
   const t = PERIOD_TEXT[period];
   const conv = conversionLabel(business);

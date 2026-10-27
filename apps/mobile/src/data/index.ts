@@ -11,6 +11,13 @@ export * from './mock';
 export const HIDDEN = new Set<string>();
 export const isListed = (b: Business) => !HIDDEN.has(b.slug);
 
+/**
+ * Nivel de cada perfil (se llena con las mensualidades). Premium sale antes en búsquedas y categorías;
+ * VIP sale primero en su especialidad. Dentro del mismo nivel manda la calificación.
+ */
+export const PLAN_OF: Record<string, 'estandar' | 'premium' | 'vip'> = {};
+export const planRank = (b: Business) => ({ vip: 2, premium: 1, estandar: 0 })[PLAN_OF[b.slug] ?? 'estandar'];
+
 export function getBusiness(slug: string | undefined): Business | undefined {
   return BUSINESSES.find((b) => b.slug === slug);
 }
@@ -51,7 +58,7 @@ export function specialtiesIn(b: Business, world?: 'profesionales' | 'oficios'):
 }
 
 export function businessesInCategory(slug: string): Business[] {
-  return BUSINESSES.filter((b) => isListed(b) && inCategory(b, slug));
+  return BUSINESSES.filter((b) => isListed(b) && inCategory(b, slug)).sort((a, b) => planRank(b) - planRank(a) || b.rating - a.rating);
 }
 
 export const ATTEND_LABEL: Record<Attend, string> = {
@@ -123,8 +130,9 @@ export function searchProfessionals(q: string, f: SearchFilters = {}): Business[
     if (sort === 'resenas') return b.ratingCount - a.ratingCount;
     if (sort === 'calificacion') return b.rating - a.rating || b.ratingCount - a.ratingCount;
     // relevancia: verificados, mejor calificados y con más reseñas
+    // Premium y VIP salen antes (lo que pagan); luego verificados, mejor calificados y con más reseñas
     const score = (x: Business) => x.rating * 10 + Math.log10(x.ratingCount + 1) * 4 + (x.verified ? 3 : 0) + (x.isOpen ? 1 : 0);
-    return score(b) - score(a);
+    return planRank(b) - planRank(a) || score(b) - score(a);
   });
   return list;
 }

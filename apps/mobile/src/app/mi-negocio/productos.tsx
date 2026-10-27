@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
+import { LIMITS, PlanLock, useMyPlan } from '@/components/plan-lock';
 import { BottomBar, Button, Card, Chip, Header } from '@/components/ui';
 import { Brand } from '@/constants/theme';
 import { money } from '@/lib/format';
@@ -16,10 +17,12 @@ const KIND: Record<string, { label: string; bg: string; fg: string }> = {
 export default function Productos() {
   const router = useRouter();
   const { state, actions } = useApp();
+  const plan = useMyPlan();
+  const full = plan === 'estandar' && state.myItems.length >= LIMITS.servicios;
 
   return (
     <View style={{ flex: 1, backgroundColor: Brand.tortilla }}>
-      <Header title="Mis servicios" subtitle={`${state.myItems.length} publicados en tu perfil`} color={Brand.ink} />
+      <Header title="Mis servicios" subtitle={plan === 'estandar' ? `${state.myItems.length} de ${LIMITS.servicios} en tu plan Estándar` : `${state.myItems.length} publicados en tu perfil`} color={Brand.ink} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 130 }}>
         {state.myItems.map((it) => (
           <Card key={it.id} style={styles.row}>
@@ -43,9 +46,12 @@ export default function Productos() {
             </View>
           </Card>
         ))}
+        {full ? (
+          <PlanLock need="premium" title="Ya tienes tus 5 servicios" text="Con Premium agregas servicios y paquetes sin límite, y además sales antes en las búsquedas." />
+        ) : null}
       </ScrollView>
       <BottomBar>
-        <Button label="Agregar servicio" icon="add" onPress={() => router.push('/mi-negocio/producto-nuevo')} />
+        <Button label={full ? 'Llegaste al límite de tu plan' : 'Agregar servicio'} icon="add" disabled={full} onPress={() => router.push('/mi-negocio/producto-nuevo')} />
       </BottomBar>
     </View>
   );

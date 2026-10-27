@@ -9,3 +9,15 @@ major_version = 17
 [db.seed]
 enabled = true
 sql_paths = ["./seed.sql"]
+
+# Funciones (Edge Functions). Revisan ellas mismas quién llama:
+# mp-suscripcion pide la sesión del negocio, mp-webhook revisa la firma de Mercado Pago
+# y avisos-mensualidades pide el encabezado x-cron-secret.
+[functions.mp-suscripcion]
+verify_jwt = false
+
+[functions.mp-webhook]
+verify_jwt = false
+
+[functions.avisos-mensualidades]
+verify_jwt = false

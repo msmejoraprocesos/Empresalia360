@@ -8,3 +8,10 @@ export const SOPORTE_WHATSAPP = '';
  * Mientras esté vacío, la app les dice que te pidan los datos por correo.
  */
 export const COBRO_EXPERTALIA = '';
+
+/**
+ * Cobro automático con tarjeta (Mercado Pago). Ponlo en true cuando ya subiste las funciones
+ * mp-suscripcion y mp-webhook y guardaste tu MP_ACCESS_TOKEN (ver docs/CONECTAR-SUPABASE.md, paso 7).
+ * Sin base conectada (demostración) el botón siempre se muestra y el pago se simula.
+ */
+export const MERCADO_PAGO_ACTIVO = false;

@@ -5,7 +5,7 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AVATARS } from '@/constants/avatars';
 import type { EmojiName } from '@/constants/emoji';
 import { Brand, Radius, Shadow } from '@/constants/theme';
-import { ATTEND_LABEL, categoriesOf, categoryBySlug, categoryFor, distanceTo, initials, primaryAction, specialtiesIn, specialtyCategory, specialtyEmoji } from '@/data';
+import { ATTEND_LABEL, PLAN_OF, categoriesOf, categoryBySlug, categoryFor, distanceTo, initials, primaryAction, specialtiesIn, specialtyCategory, specialtyEmoji } from '@/data';
 import type { Attend, Business } from '@/data/types';
 import type { Source } from '@/data/stats';
 import { markSource, track } from '@/lib/analytics';
@@ -92,10 +92,15 @@ export function BusinessCard({
         <ProAvatar business={business} size={72} categorySlug={cat?.slug} />
         <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <Text style={styles.name} numberOfLines={1}>
+            <Text style={[styles.name, { flexShrink: 1 }]} numberOfLines={1}>
               {business.name}
             </Text>
             {business.verified ? <Emoji name="palomita" size={16} label="Verificado" /> : null}
+            {PLAN_OF[business.slug] === 'vip' ? (
+              <Text style={styles.vip}>VIP</Text>
+            ) : PLAN_OF[business.slug] === 'premium' ? (
+              <Text style={styles.premium}>Premium</Text>
+            ) : null}
           </View>
           <Text style={styles.sub} numberOfLines={1}>
             {cat && cat.slug !== business.categorySlug ? `${cat.name} · ${business.profession}` : business.profession}
@@ -187,6 +192,8 @@ export function Tag({ emoji, text, bg, fg }: { emoji: EmojiName; text: string; b
 }
 
 const styles = StyleSheet.create({
+  vip: { flexShrink: 0, fontSize: 10, fontWeight: '900', color: '#13203F', backgroundColor: '#E3B04B', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, overflow: 'hidden' },
+  premium: { flexShrink: 0, fontSize: 10, fontWeight: '800', color: '#FFFFFF', backgroundColor: '#1F3A68', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, overflow: 'hidden' },
   also: { fontSize: 12, fontWeight: '700', color: '#8A6A12' },
   card: { backgroundColor: Brand.white, borderRadius: Radius.lg, padding: 14, gap: 10 },
   row: { flexDirection: 'row', gap: 14, alignItems: 'center' },

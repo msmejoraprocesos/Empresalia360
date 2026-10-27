@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { OPENING_ADS, type OpeningAd } from '@/data/ads';
-import { HIDDEN } from '@/data';
+import { HIDDEN, PLAN_OF } from '@/data';
 import { BUSINESSES, INCOMING_REQUESTS, INITIAL_ORDERS, MY_BUSINESS_SLUG, POSTS, PROMOTIONS, QUESTIONS } from '@/data/mock';
-import { addMonths, billingStatus, demoBilling, isoDate, parseDate, today, type Billing, type PlanId, type SubPayment } from '@/data/billing';
+import { addMonths, billingStatus, demoBilling, newBilling, isoDate, parseDate, today, type Billing, type PlanId, type SubPayment } from '@/data/billing';
 import { loadAccount, loadBilling, loadCommunity, remote, saveBusiness, type AccountData } from '@/data/remote';
 import { track } from '@/lib/analytics';
 import { uploadPhoto } from '@/lib/photos';
@@ -128,6 +128,10 @@ type State = {
   providerInbox: ProviderRequest[];
   // administración
   pendingBusinesses: PendingBusiness[];
+  /** Pendientes del administrador con la base conectada (reclamos + cédulas por verificar) */
+  adminPending: number | null;
+  /** Cambia cuando el administrador modifica negocios en modo demostración */
+  adminVersion: number;
   reportedReviews: ReportedReview[];
   campaigns: AdCampaign[];
   feedWeights: { afinidad: number; cercania: number; calificacion: number; urgencia: number; abierto: number };
@@ -222,7 +226,9 @@ const initialState: State = {
     { id: 'pr1', from: 'Ortiz Salinas Abogados', distanceKm: 1.8, part: 'Juicio de arrendamiento', vehicle: 'Cliente con local comercial · 6 meses de adeudo', urgent: false, status: 'nueva' },
     { id: 'pr2', from: 'Despacho Contable Reyes', distanceKm: 0.6, part: 'Testamento', vehicle: 'Cliente del despacho, 2 inmuebles', urgent: false, status: 'nueva' },
   ],
-  pendingBusinesses: [
+  adminPending: null,
+  adminVersion: 0,
+  pendingBusinesses: online ? [] : [
     { id: 'pb1', name: 'Lic. Fernanda Ruiz', category: 'Abogados', zone: 'Juriquilla', owner: 'Fernanda R.', license: 'Cédula 11234567 · Licenciatura en Derecho' },
     { id: 'pb2', name: 'Valuadores del Bajío', category: 'Arquitectura e ingeniería', zone: 'Centro Sur', owner: 'Ing. Ramos', license: 'Cédula 8456120 · Ingeniería Civil' },
     { id: 'pb3', name: 'Electricista Saúl Cano', category: 'Electricidad', zone: 'El Marqués', owner: 'Saúl C.', license: 'Certificado CONOCER EC0586 · instalaciones eléctricas' },
@@ -285,7 +291,10 @@ function helpfulKeys(questions: Question[], ids: string[]): string[] {
 function useAppState() {
   const [state, setState] = useState<State>(() => {
     const world = loadWorld();
-    for (const [slug, b] of Object.entries(initialState.billing)) if (billingStatus(b) === 'suspendido') HIDDEN.add(slug);
+    for (const [slug, b] of Object.entries(initialState.billing)) {
+      if (billingStatus(b) === 'suspendido') HIDDEN.add(slug);
+      PLAN_OF[slug] = b.plan;
+    }
     return { ...initialState, role: loadRole(), lookingFor: world ?? initialState.lookingFor, worldChosen: Boolean(world) };
   });
   const update = useCallback((fn: (s: State) => State) => setState(fn), []);
@@ -294,7 +303,11 @@ function useAppState() {
   // Los perfiles suspendidos por falta de pago se ocultan del directorio
   useEffect(() => {
     HIDDEN.clear();
-    for (const [slug, b] of Object.entries(state.billing)) if (billingStatus(b) === 'suspendido') HIDDEN.add(slug);
+    for (const k of Object.keys(PLAN_OF)) delete PLAN_OF[k];
+    for (const [slug, b] of Object.entries(state.billing)) {
+      if (billingStatus(b) === 'suspendido') HIDDEN.add(slug);
+      PLAN_OF[slug] = b.plan;
+    }
   }, [state.billing]);
   useEffect(() => {
     if (!state.worldChosen) return;
@@ -315,7 +328,7 @@ function useAppState() {
     (acc: AccountData | null) => {
       if (!acc) {
         myBusiness = demoBusiness;
-        update((s) => ({ ...s, account: null, orders: [], requests: [], likedPosts: [], helpful: [], helpfulIds: [], myItems: myBusiness.items, profileVersion: s.profileVersion + 1 }));
+        update((s) => ({ ...s, account: null, isAdmin: online ? false : s.isAdmin, orders: [], requests: [], likedPosts: [], helpful: [], helpfulIds: [], myItems: myBusiness.items, profileVersion: s.profileVersion + 1 }));
         return;
       }
       const own = acc.businessSlug ? BUSINESSES.find((b) => b.slug === acc.businessSlug) : undefined;
@@ -323,6 +336,8 @@ function useAppState() {
       update((s) => ({
         ...s,
         account: { userId: acc.userId, email: acc.email, name: acc.name, businessSlug: acc.businessSlug },
+        // Con la base conectada, el panel de administración solo se abre con una cuenta de administrador
+        isAdmin: acc.isAdmin,
         userName: acc.name.split(' ')[0] || s.userName,
         orders: acc.orders,
         requests: acc.requests,
@@ -362,7 +377,8 @@ function useAppState() {
       refreshAccount,
       refreshCommunity,
       setRole: (role: Role | null) => update((s) => ({ ...s, role })),
-      setAdmin: (isAdmin: boolean) => update((s) => ({ ...s, isAdmin })),
+      // Sin base (demostración) se entra directo; con base conectada solo la cuenta con role = 'admin'
+      setAdmin: (isAdmin: boolean) => update((s) => ({ ...s, isAdmin: online ? s.isAdmin : isAdmin })),
       setLookingFor: (lookingFor: LookingFor) => update((s) => ({ ...s, lookingFor, worldChosen: true })),
       toggleFavorite: (slug: string) =>
         update((s) => ({
@@ -638,7 +654,7 @@ function useAppState() {
           const start = b.paidUntil && parseDate(b.paidUntil) > today() ? parseDate(b.paidUntil) : today();
           const end = isoDate(addMonths(start, p.months));
           const payments = b.payments.map((x) => (x.id === paymentId ? { ...x, status: 'pagado' as const, periodEnd: end } : x));
-          return { ...s, billing: { ...s.billing, [slug]: { plan: p.plan, paidUntil: end, payments } } };
+          return { ...s, billing: { ...s.billing, [slug]: { ...b, plan: p.plan, paidUntil: end, payments } } };
         });
       },
       rejectSubPayment: (slug: string, paymentId: string) => {
@@ -660,8 +676,24 @@ function useAppState() {
           const start = b.paidUntil && parseDate(b.paidUntil) > today() ? parseDate(b.paidUntil) : today();
           const end = isoDate(addMonths(start, months));
           const pay: SubPayment = { id: uid(), plan, months, amount, method, reference: 'Registrado por el administrador', status: 'pagado', createdAt: Date.now(), periodEnd: end };
-          return { ...s, billing: { ...s.billing, [slug]: { plan, paidUntil: end, payments: [pay, ...b.payments] } } };
+          return { ...s, billing: { ...s.billing, [slug]: { ...b, plan, paidUntil: end, payments: [pay, ...b.payments] } } };
         });
+      },
+      /**
+       * Pago con tarjeta automático. Con la base conectada lo hace Mercado Pago (la pantalla abre su liga);
+       * en la demostración se simula: queda activo y se registra el primer cobro.
+       */
+      activateCardDemo: (slug: string, plan: PlanId, amount: number) =>
+        update((s) => {
+          const b = s.billing[slug] ?? { plan, payments: [] };
+          const start = b.paidUntil && parseDate(b.paidUntil) > today() ? parseDate(b.paidUntil) : today();
+          const end = isoDate(addMonths(start, 1));
+          const pay: SubPayment = { id: uid(), plan, months: 1, amount, method: 'mercadopago', reference: 'Cobro automático Mercado Pago', status: 'pagado', createdAt: Date.now(), periodEnd: end };
+          return { ...s, billing: { ...s.billing, [slug]: { ...b, plan, paidUntil: end, auto: 'activo', payments: [pay, ...b.payments] } } };
+        }),
+      cancelCard: (slug: string) => {
+        if (online) void remote.cancelCard().then(() => refreshBilling());
+        update((s) => (s.billing[slug] ? { ...s, billing: { ...s.billing, [slug]: { ...s.billing[slug], auto: 'cancelado' } } } : s));
       },
       refreshBilling,
       toggleCampaign: (id: string) =>
@@ -680,6 +712,13 @@ function useAppState() {
         }),
 
       // Administración
+      setAdminPending: (n: number) => update((s) => ({ ...s, adminPending: n })),
+      bumpAdmin: () => update((s) => ({ ...s, adminVersion: s.adminVersion + 1 })),
+      /** Alta hecha por el administrador sin base conectada (demostración) */
+      addLocalBusiness: (b: Business) => {
+        BUSINESSES.unshift(b);
+        update((s) => ({ ...s, adminVersion: s.adminVersion + 1, billing: { ...s.billing, [b.slug]: newBilling() } }));
+      },
       approveBusiness: (id: string) => update((s) => ({ ...s, pendingBusinesses: s.pendingBusinesses.filter((b) => b.id !== id) })),
       resolveReport: (id: string) => update((s) => ({ ...s, reportedReviews: s.reportedReviews.filter((r) => r.id !== id) })),
       createCampaign: (c: Omit<AdCampaign, 'id' | 'status'>) =>

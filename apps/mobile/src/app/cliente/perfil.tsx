@@ -61,17 +61,21 @@ export default function Perfil() {
               actions.setRole('negocio');
               router.replace('/panel');
             }}
+            last={isSupabaseConfigured && !state.isAdmin}
           />
-          <ListRow
-            icon="shield-checkmark-outline"
-            title="Panel de administración"
-            subtitle="Solo para el operador de Expertalia 360"
-            onPress={() => {
-              actions.setAdmin(true);
-              router.push('/admin');
-            }}
-            last
-          />
+          {/* Con la base conectada solo lo ve la cuenta de administrador */}
+          {!isSupabaseConfigured || state.isAdmin ? (
+            <ListRow
+              icon="shield-checkmark-outline"
+              title="Panel de administración"
+              subtitle="Solo para el operador de Expertalia 360"
+              onPress={() => {
+                actions.setAdmin(true);
+                router.push('/admin');
+              }}
+              last
+            />
+          ) : null}
         </Card>
 
         <Text style={styles.section}>Ayuda</Text>

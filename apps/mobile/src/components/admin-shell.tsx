@@ -1,11 +1,12 @@
 import { usePathname, useRouter, type Href } from 'expo-router';
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useRef, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/brand-logo';
 import { Brand, Radius } from '@/constants/theme';
 import { billingStatus } from '@/data/billing';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { useApp } from '@/store/app';
 
 const NAV: { href: string; label: string; badge?: 'negocios' | 'moderacion' | 'campanas' | 'mensualidades' }[] = [
@@ -27,13 +28,37 @@ export function AdminShell({ title, subtitle, children, action }: { title: strin
   const path = usePathname();
   const { state } = useApp();
   const wide = width >= 900;
+  // En el teléfono, el menú de arriba se desplaza solo hasta la opción abierta (antes regresaba al inicio)
+  const navRef = useRef<ScrollViewInstance>(null);
+  const activeX = useRef(0);
   const counts = {
-    negocios: state.pendingBusinesses.length,
+    negocios: state.adminPending ?? state.pendingBusinesses.length,
     moderacion: state.reportedReviews.length,
     campanas: state.campaigns.filter((c) => c.status === 'en_revision').length,
     // Pagos por confirmar + negocios vencidos
     mensualidades: Object.values(state.billing).filter((b) => b.payments.some((p) => p.status === 'pendiente') || ['vencido', 'suspendido'].includes(billingStatus(b))).length,
   };
+
+  // Con la base conectada, solo una cuenta con role = 'admin' entra (la base además lo exige en cada dato)
+  if (isSupabaseConfigured && !state.isAdmin) {
+    return (
+      <View style={{ flex: 1, backgroundColor: Brand.ink, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+        <BrandLogo variant="claro" width={220} />
+        <Text style={{ color: Brand.white, fontSize: 20, fontWeight: '800', textAlign: 'center' }}>Solo para el administrador</Text>
+        <Text style={{ color: '#B7C1D3', fontSize: 14, textAlign: 'center', maxWidth: 360 }}>
+          {state.account ? 'Esta cuenta no es de administrador.' : 'Entra con el correo de la cuenta de administrador.'}
+        </Text>
+        {!state.account ? (
+          <Pressable onPress={() => router.push('/entrar')} style={styles.lockBtn} accessibilityRole="button">
+            <Text style={{ color: Brand.ink, fontWeight: '800' }}>Entrar con mi correo</Text>
+          </Pressable>
+        ) : null}
+        <Pressable onPress={() => router.replace('/')} accessibilityRole="link">
+          <Text style={{ color: '#E3E8EF', textDecorationLine: 'underline' }}>Volver al inicio</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   const nav = NAV.map((n) => {
     const on = path === n.href;
@@ -41,6 +66,10 @@ export function AdminShell({ title, subtitle, children, action }: { title: strin
     return (
       <Pressable
         key={n.href}
+        onLayout={on && !wide ? (e) => {
+          activeX.current = e.nativeEvent.layout.x;
+          navRef.current?.scrollTo({ x: Math.max(0, activeX.current - 48), animated: false });
+        } : undefined}
         onPress={() => router.push(n.href as Href)}
         accessibilityRole="link"
         accessibilityState={{ selected: on }}
@@ -77,7 +106,12 @@ export function AdminShell({ title, subtitle, children, action }: { title: strin
               <Text style={{ color: '#E3E8EF', fontSize: 13 }}>Salir</Text>
             </Pressable>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 8 }}>
+          <ScrollView
+            ref={navRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ padding: 12, gap: 8 }}
+            onContentSizeChange={() => navRef.current?.scrollTo({ x: Math.max(0, activeX.current - 48), animated: false })}>
             {nav}
           </ScrollView>
         </View>
@@ -103,6 +137,7 @@ export function AdminCard({ children, style }: { children: ReactNode; style?: ob
 }
 
 const styles = StyleSheet.create({
+  lockBtn: { backgroundColor: Brand.mango, borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 12 },
   side: { width: 240, backgroundColor: Brand.ink, paddingHorizontal: 14 },
   logo: { fontSize: 24, fontWeight: '800', color: '#3E62A0', paddingHorizontal: 12 },
   sideSub: { fontSize: 12, color: '#B7C1D3', paddingHorizontal: 12, fontWeight: '500' },

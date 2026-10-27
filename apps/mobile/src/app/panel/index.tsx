@@ -75,7 +75,9 @@ export default function ProfesionalInicio() {
           if (!bill) return null;
           const st = billingStatus(bill);
           const pend = bill.payments.some((p) => p.status === 'pendiente');
+          // Con tarjeta automática no se le molesta antes de vencer: se cobra solo
           if (!pend && !['por_vencer', 'vencido', 'suspendido'].includes(st)) return null;
+          if (!pend && st === 'por_vencer' && bill.auto === 'activo') return null;
           const left = daysLeft(bill.paidUntil);
           const red = !pend && st !== 'por_vencer';
           const text = pend

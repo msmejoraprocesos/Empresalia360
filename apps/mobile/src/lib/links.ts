@@ -9,6 +9,11 @@ export const profileLink = (slug: string) => `${PUBLIC_URL}?p=${encodeURICompone
 /** Liga que abre directo "Escribir reseña" del experto. */
 export const reviewLink = (slug: string) => `${PUBLIC_URL}?p=${encodeURIComponent(slug)}&r=1`;
 
+/** Mensaje para que el experto reclame el perfil que le dio de alta el administrador */
+export const claimMessage = (name: string, slug: string) =>
+  `Hola, ${name}. Te di de alta en Expertalia 360, el directorio de expertos de tu zona. Esta es tu página: ${profileLink(slug)}\n\n` +
+  'Para que quede a tu nombre: ábrela, toca "¿Eres tú? Reclama este perfil" y entra con tu correo. Tienes 30 días gratis para probar.';
+
 /** Deja solo dígitos y agrega 52 (México) si es un celular de 10 dígitos. */
 export function waNumber(phone: string | undefined): string {
   const d = (phone ?? '').replace(/\D/g, '');

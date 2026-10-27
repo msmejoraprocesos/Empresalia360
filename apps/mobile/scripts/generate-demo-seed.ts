@@ -128,6 +128,7 @@ for (const b of BUSINESSES) {
       ? `update public.businesses set plan = 'estandar', paid_plan = 'estandar', paid_until = current_date + 30, plan_status = 'al_corriente' where slug = ${q(b.slug)};`
       : `update public.businesses set plan = ${q(bill.plan)}, paid_plan = ${q(bill.plan)}, paid_until = current_date + ${off}, plan_status = public.billing_status(${q(bill.plan)}, current_date + ${off}), hidden_unpaid = public.billing_status(${q(bill.plan)}, current_date + ${off}) = 'suspendido' where slug = ${q(b.slug)};`,
   );
+  if (bill.auto === 'activo') out.push(`update public.businesses set mp_status = 'activo', mp_plan = ${q(bill.plan)} where slug = ${q(b.slug)};`);
   for (const p of bill.payments) {
     out.push(
       `insert into public.subscription_payments (business_id, plan, months, amount, method, reference, status, period_end, created_at, created_by) select ${bid}, ${q(p.plan)}, ${p.months}, ${p.amount}, ${q(p.method)}, ${q(p.reference)}, ${q(p.status)}, ${p.status === 'pagado' && off !== null ? `current_date + ${off}` : 'null'}, now() - interval '${Math.max(0, Math.round((Date.now() - p.createdAt) / 3600000))} hours', null where not exists (select 1 from public.subscription_payments where business_id = ${bid} and reference = ${q(p.reference)});`,
