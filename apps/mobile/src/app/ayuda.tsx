@@ -10,11 +10,11 @@ import { Brand } from '@/constants/theme';
 import { openWhatsApp } from '@/lib/links';
 
 const FAQ: { emoji: EmojiName; q: string; a: string }[] = [
-  { emoji: 'lupa', q: '¿Cómo encuentro a quien me ayude?', a: 'En Inicio elige Profesionistas u Oficios, luego toca un dibujo o escribe tu problema (también puedes hablar con el micrófono). Verás a los expertos más cercanos con sus estrellas.' },
+  { emoji: 'lupa', q: '¿Cómo encuentro a quien me ayude?', a: 'En Inicio toca un dibujo o escribe tu problema (también puedes hablar con el micrófono). Verás a los expertos más cercanos con sus estrellas.' },
   { emoji: 'calendario', q: '¿Cómo agendo una cita?', a: 'Abre el perfil del experto y toca Agendar. Elige el día y la hora. La cita aparece en Mis citas y el experto la confirma.' },
   { emoji: 'billete', q: '¿Cómo pago?', a: 'Le pagas directo al experto, en efectivo al atenderte o por transferencia. Si eliges transferencia, te mostramos sus datos. La app no te cobra comisión.' },
   { emoji: 'estrella', q: '¿Cómo dejo una reseña?', a: 'Después de tu cita, en Mis citas toca Calificar. También puedes escanear el QR del experto o abrir la liga que te mande.' },
-  { emoji: 'trabajador', q: 'Soy profesional u oficio, ¿cómo me registro?', a: 'En Perfil toca Soy profesional u oficio, entra con tu correo y llena tu perfil. Apareces de inmediato; la palomita de verificado llega cuando revisamos tu cédula o certificado.' },
+  { emoji: 'trabajador', q: 'Soy profesionista, ¿cómo me registro?', a: 'En Perfil toca Soy profesionista, entra con tu correo y llena tu perfil. Apareces de inmediato; la palomita de verificado llega cuando revisamos tu cédula.' },
   { emoji: 'celular_flecha', q: '¿Para qué es mi QR?', a: 'Si eres profesional, en Más → Mi QR tienes un código que abre tu página. Ponlo en tus tarjetas o tu despacho. Tiene otra versión para pedir reseñas.' },
   { emoji: 'escudo', q: '¿Es seguro?', a: 'Tu teléfono y tu correo no se muestran a los expertos. Las reseñas solo se pueden escribir con cuenta, y las falsas u ofensivas se ocultan.' },
 ];

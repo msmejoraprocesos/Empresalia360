@@ -29,6 +29,7 @@ import {
 import { money } from '@/lib/format';
 import { openWhatsApp } from '@/lib/links';
 import { useApp } from '@/store/app';
+import { MUNDO, UN_SOLO_MUNDO } from '@/constants/app-config';
 
 type Tab = 'confirmar' | 'vencidos' | 'por_vencer' | 'al_corriente' | 'prueba';
 const TABS: { id: Tab; label: string }[] = [
@@ -54,7 +55,7 @@ export default function AdminMensualidades() {
   const { state, actions } = useApp();
   const [tab, setTab] = useState<Tab>('confirmar');
   const [registering, setRegistering] = useState<string | null>(null);
-  const [mundo, setMundo] = useState<'todos' | World>('todos');
+  const [mundo, setMundo] = useState<'todos' | World>(UN_SOLO_MUNDO ? MUNDO : 'todos');
 
   const allRows = BUSINESSES.map((b) => {
     const bill = state.billing[b.slug] ?? { plan: 'estandar' as PlanId, payments: [] };
@@ -91,7 +92,7 @@ export default function AdminMensualidades() {
   return (
     <AdminShell title="Mensualidades" subtitle="Quién pagó, quién debe y quién avisó que ya pagó">
       <View style={styles.kpis}>
-        {(['profesionales', 'oficios'] as World[]).map((w) => {
+        {(UN_SOLO_MUNDO ? [MUNDO] : (['profesionales', 'oficios'] as World[])).map((w) => {
           const d = byWorld(w);
           const on = mundo === w;
           return (
@@ -118,13 +119,13 @@ export default function AdminMensualidades() {
         })}
       </View>
       <View style={styles.tabs}>
-        {([['todos', 'Todos'], ['profesionales', 'Profesionistas'], ['oficios', 'Oficios']] as const).map(([id, label]) => (
+        {(UN_SOLO_MUNDO ? [] : ([['todos', 'Todos'], ['profesionales', 'Profesionistas'], ['oficios', 'Oficios']] as const)).map(([id, label]) => (
           <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected: mundo === id }} onPress={() => setMundo(id)} style={[styles.tab, mundo === id && styles.tabOn]}>
             <Text style={[styles.tabText, mundo === id && { color: Brand.white }]}>{label}</Text>
           </Pressable>
         ))}
       </View>
-      <Text style={styles.sub}>{mundo === 'todos' ? 'Totales de los dos mundos' : `Solo ${mundo === 'oficios' ? 'oficios' : 'profesionistas'}`}</Text>
+      <Text style={styles.sub}>{UN_SOLO_MUNDO ? 'Totales del mes' : mundo === 'todos' ? 'Totales de los dos mundos' : `Solo ${mundo === 'oficios' ? 'oficios' : 'profesionistas'}`}</Text>
       <View style={styles.kpis}>
         <Kpi label="Cobrado este mes" value={money(paidThisMonth)} tone="ok" />
         <Kpi label="Ingreso mensual de planes" value={money(mrr)} />
@@ -164,7 +165,7 @@ export default function AdminMensualidades() {
                 <Text style={styles.name}>{b.name}</Text>
                 <Text style={styles.sub}>
                   {plan.name}
-                  {` · ${money(price)}/mes · ${world === 'oficios' ? 'Oficio' : 'Profesionista'}`}
+                  {` · ${money(price)}/mes${UN_SOLO_MUNDO ? '' : ` · ${world === 'oficios' ? 'Oficio' : 'Profesionista'}`}`}
                   {st === 'suspendido' ? ' · oculto del directorio' : ''}
                 </Text>
                 {bill.paidUntil ? (
@@ -250,7 +251,7 @@ export default function AdminMensualidades() {
           <AdminCard key={p.id} style={{ flexGrow: 1, flexBasis: 200, gap: 4 }}>
             <Text style={styles.name}>{p.name}</Text>
             <Text style={styles.price}>{money(p.prices.profesionales)}/mes</Text>
-            <Text style={styles.sub}>Oficios: {money(p.prices.oficios)}/mes</Text>
+            {UN_SOLO_MUNDO ? null : <Text style={styles.sub}>Oficios: {money(p.prices.oficios)}/mes</Text>}
             <Text style={styles.small}>{p.features.join(' · ')}</Text>
             <Chip label={`${rows.filter((r) => activePlan(r.bill) === p.id).length} negocios`} />
           </AdminCard>

@@ -34,7 +34,7 @@ export function ClaimCard({ business }: { business: Business }) {
       <Card style={[styles.card, { backgroundColor: '#DDF3E8' }]}>
         <Emoji name="palomita" size={40} />
         <Text style={styles.h}>¡Listo! Recibimos tu solicitud</Text>
-        <Text style={styles.text}>La revisamos y te avisamos. En cuanto se apruebe, este perfil pasa a tu cuenta y lo administras desde “Soy profesional u oficio”.</Text>
+        <Text style={styles.text}>La revisamos y te avisamos. En cuanto se apruebe, este perfil pasa a tu cuenta y lo administras desde “Soy profesionista”.</Text>
       </Card>
     );
   }

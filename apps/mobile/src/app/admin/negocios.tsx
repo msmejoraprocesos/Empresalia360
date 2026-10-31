@@ -10,13 +10,14 @@ import { adminResolveClaim, adminUpdateBusiness, loadAdmin, type AdminBusiness, 
 import { claimMessage, openWhatsApp } from '@/lib/links';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useApp } from '@/store/app';
+import { UN_SOLO_MUNDO } from '@/constants/app-config';
 
 type World = 'profesionales' | 'oficios';
 const worldOfCat = (slug: string): World => (CATEGORIES.find((c) => c.slug === slug)?.group ?? 'profesionales') as World;
 
 // Reclamo de ejemplo para la demostración (sin base conectada)
 const DEMO_CLAIMS: AdminClaim[] = [
-  { id: 'cl-demo', businessId: 'cerrajeria-llave-maestra', businessSlug: 'cerrajeria-llave-maestra', businessName: 'Cerrajería Llave Maestra', userName: 'Javier Torres', userEmail: 'javier.torres@correo.mx', note: 'Soy el dueño, mi WhatsApp es el mismo del perfil.', status: 'pendiente', createdAt: new Date().toISOString() },
+  { id: 'cl-demo', businessId: 'traducciones-peritas-morales', businessSlug: 'traducciones-peritas-morales', businessName: 'Traducciones Peritas Morales', userName: 'Javier Morales', userEmail: 'javier.morales@correo.mx', license: 'Perito traductor 4471', note: 'Soy el titular, mi WhatsApp es el mismo del perfil.', status: 'pendiente', createdAt: new Date().toISOString() },
 ];
 
 /**
@@ -107,7 +108,7 @@ export default function AdminNegocios() {
       action={<Button label="Dar de alta un experto" icon="person-add-outline" small onPress={() => router.push('/admin/alta')} />}>
       <AdminCard style={{ backgroundColor: '#13203F', gap: 6 }}>
         <Text style={[styles.name, { color: '#E3B04B' }]}>¿Quién da de alta a los expertos?</Text>
-        <Text style={styles.rule}>• El experto solo: entra a la app, toca “Soy profesional u oficio” y crea su perfil (sale al momento, sin palomita hasta que verifiques su cédula).</Text>
+        <Text style={styles.rule}>• El experto solo: entra a la app, toca “Soy profesionista” y crea su perfil (sale al momento, sin palomita hasta que verifiques su cédula).</Text>
         <Text style={styles.rule}>• Tú: con “Dar de alta un experto” lo registras y le mandas la liga por WhatsApp. Él toca “¿Eres tú? Reclama este perfil” y tú lo apruebas aquí.</Text>
       </AdminCard>
 
@@ -137,7 +138,7 @@ export default function AdminNegocios() {
           <View style={{ flex: 1, minWidth: 220, gap: 2 }}>
             <Text style={styles.name}>{b.name}</Text>
             <Text style={styles.sub}>
-              {categoryName(b.categorySlug)} · {worldOfCat(b.categorySlug) === 'oficios' ? 'Oficio' : 'Profesionista'} · {b.zone}
+              {categoryName(b.categorySlug)}{UN_SOLO_MUNDO ? '' : ` · ${worldOfCat(b.categorySlug) === 'oficios' ? 'Oficio' : 'Profesionista'}`} · {b.zone}
             </Text>
             <Text style={styles.sub}>{b.license ? `Documento: ${b.license}` : 'No ha cargado cédula ni certificado'}</Text>
             {worldOfCat(b.categorySlug) === 'profesionales' ? (
@@ -171,7 +172,7 @@ export default function AdminNegocios() {
       <Text style={[styles.h, { marginTop: 8 }]}>Todos los perfiles</Text>
       <View style={[styles.wrap, { alignItems: 'center' }]}>
         <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre o categoría" placeholderTextColor={Brand.inkMuted} style={styles.input} />
-        {([['todos', 'Todos'], ['profesionales', 'Profesionistas'], ['oficios', 'Oficios']] as const).map(([id, label]) => (
+        {(UN_SOLO_MUNDO ? [] : ([['todos', 'Todos'], ['profesionales', 'Profesionistas'], ['oficios', 'Oficios']] as const)).map(([id, label]) => (
           <Pressable key={id} onPress={() => setMundo(id)} style={[styles.tab, mundo === id && styles.tabOn]} accessibilityRole="tab" accessibilityState={{ selected: mundo === id }}>
             <Text style={[styles.tabText, mundo === id && { color: Brand.white }]}>{label}</Text>
           </Pressable>

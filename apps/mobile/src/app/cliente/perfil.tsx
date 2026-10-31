@@ -55,7 +55,7 @@ export default function Perfil() {
             icon="briefcase-outline"
             iconBg={Brand.nopalSoft}
             iconColor={Brand.nopalDark}
-            title="Soy profesional u oficio"
+            title="Soy profesionista"
             subtitle="Crea tu perfil y recibe clientes"
             onPress={() => {
               actions.setRole('negocio');

@@ -9,6 +9,7 @@ import { track } from '@/lib/analytics';
 import { uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
 import type { Business, CatalogItem, IncomingRequest, Order, OrderMode, PaymentMethod, Post, Question, Review, Role, Sale } from '@/data/types';
+import { MUNDO, UN_SOLO_MUNDO } from '@/constants/app-config';
 
 // ─────────────────────────────────────────────────────────────
 // Tipos del estado
@@ -156,17 +157,17 @@ const online = supabase !== null;
 const initialState: State = {
   role: null,
   account: null,
-  lookingFor: 'profesionales',
-  worldChosen: false,
+  lookingFor: MUNDO,
+  worldChosen: UN_SOLO_MUNDO,
   isAdmin: false,
   userName: 'Ana',
   userPhone: '442 318 0094',
   points: 1240,
-  favorites: ['plomeria-hernandez', 'despacho-contable-reyes'],
+  favorites: ['psic-andrea-vidal', 'despacho-contable-reyes'],
   cart: { businessSlug: null, mode: 'para_llevar', lines: {} },
   // Con Supabase, las citas y solicitudes reales llegan al entrar
   orders: online ? [] : INITIAL_ORDERS,
-  stamps: { 'despacho-contable-reyes': 9, 'plomeria-hernandez': 2, 'lic-mariana-ortiz': 1 },
+  stamps: { 'despacho-contable-reyes': 9, 'psic-andrea-vidal': 2, 'lic-mariana-ortiz': 1 },
   userReviews: {},
   quotes: online ? [] : [
     {
@@ -295,6 +296,7 @@ function useAppState() {
       if (billingStatus(b) === 'suspendido') HIDDEN.add(slug);
       PLAN_OF[slug] = b.plan;
     }
+    if (UN_SOLO_MUNDO) return { ...initialState, role: loadRole() };
     return { ...initialState, role: loadRole(), lookingFor: world ?? initialState.lookingFor, worldChosen: Boolean(world) };
   });
   const update = useCallback((fn: (s: State) => State) => setState(fn), []);
@@ -379,7 +381,8 @@ function useAppState() {
       setRole: (role: Role | null) => update((s) => ({ ...s, role })),
       // Sin base (demostración) se entra directo; con base conectada solo la cuenta con role = 'admin'
       setAdmin: (isAdmin: boolean) => update((s) => ({ ...s, isAdmin: online ? s.isAdmin : isAdmin })),
-      setLookingFor: (lookingFor: LookingFor) => update((s) => ({ ...s, lookingFor, worldChosen: true })),
+      // Con un solo mundo (Expertalia = profesionistas) no se cambia
+      setLookingFor: (lookingFor: LookingFor) => update((s) => (UN_SOLO_MUNDO ? s : { ...s, lookingFor, worldChosen: true })),
       toggleFavorite: (slug: string) =>
         update((s) => ({
           ...s,

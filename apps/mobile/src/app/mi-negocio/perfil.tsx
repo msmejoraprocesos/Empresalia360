@@ -15,6 +15,7 @@ import { WorldGuide } from '@/components/world-guide';
 import type { World } from '@/constants/world';
 import { activePlan, CATEGORY_LIMIT, PLANS } from '@/data/billing';
 import { myBusiness, useApp } from '@/store/app';
+import { MUNDO, UN_SOLO_MUNDO } from '@/constants/app-config';
 
 const LANGS = ['Español', 'Inglés', 'Francés', 'Alemán', 'Lengua de señas'];
 
@@ -78,7 +79,7 @@ function Editor() {
   const [categorySlug, setCategorySlug] = useState(myBusiness.categorySlug);
   // Perfil nuevo: primero elige su mundo (profesionista u oficio); los mundos no se mezclan
   const isNew = myBusiness.id === 'nuevo';
-  const [world, setWorld] = useState<World | null>(isNew ? null : categoryBySlug(myBusiness.categorySlug)?.group ?? null);
+  const [world, setWorld] = useState<World | null>(UN_SOLO_MUNDO ? MUNDO : isNew ? null : categoryBySlug(myBusiness.categorySlug)?.group ?? null);
   const [extraCats, setExtraCats] = useState<string[]>(
     (myBusiness.categorySlugs ?? []).filter((s) => s !== myBusiness.categorySlug && categoryBySlug(s)?.group === categoryBySlug(myBusiness.categorySlug)?.group),
   );
@@ -153,7 +154,7 @@ function Editor() {
           <BusinessCard business={preview} />
         </View>
 
-        <Section step={1} title="¿A qué te dedicas?" hint="Elige tu profesión u oficio">
+        <Section step={1} title="¿A qué te dedicas?" hint={UN_SOLO_MUNDO ? "Elige tu profesión" : "Elige tu profesión u oficio"}>
           <Field
             label="Nombre como quieres aparecer"
             value={name}
@@ -163,8 +164,8 @@ function Editor() {
             }}
             placeholder="Lic. Mariana Ortiz"
           />
-          <Text style={styles.fieldLabel}>¿A qué mundo perteneces?</Text>
-          <WorldGuide
+          {!UN_SOLO_MUNDO ? <Text style={styles.fieldLabel}>¿A qué mundo perteneces?</Text> : null}
+          {!UN_SOLO_MUNDO ? <WorldGuide
             value={world}
             onChange={(w) => {
               if (w === world) return;
@@ -179,7 +180,7 @@ function Editor() {
               }
               touch();
             }}
-          />
+          /> : null}
           {world ? <Text style={styles.fieldLabel}>{world === 'profesionales' ? 'Tu profesión' : 'Tu oficio'}</Text> : null}
           <View style={styles.wrap}>
             {CATEGORIES.filter((c) => c.group === world).map((c) => (

@@ -85,8 +85,8 @@ from revisado
 group by orden, archivo
 union all
 select 9, 'seed.sql (categorías y zonas)',
-       case when (select count(*) from public.categories) >= 12 and (select count(*) from public.zones) >= 1 then '✅ completo' else '❌ incompleto' end,
-       (select count(*) from public.categories) || ' categorías (deben ser 12), ' || (select count(*) from public.zones) || ' zonas'
+       case when (select count(*) from public.categories) >= 6 and (select count(*) from public.zones) >= 1 then '✅ completo' else '❌ incompleto' end,
+       (select count(*) from public.categories) || ' categorías (deben ser al menos 6), ' || (select count(*) from public.zones) || ' zonas'
 where to_regclass('public.categories') is not null
 union all
 select 10, 'Revisión diaria (pg_cron)',

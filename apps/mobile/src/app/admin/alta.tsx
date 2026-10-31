@@ -11,6 +11,7 @@ import type { Attend, Business } from '@/data/types';
 import { claimMessage, openWhatsApp } from '@/lib/links';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useApp } from '@/store/app';
+import { MUNDO, UN_SOLO_MUNDO } from '@/constants/app-config';
 
 type World = 'profesionales' | 'oficios';
 const newSlug = (name: string) =>
@@ -29,7 +30,7 @@ const ATTENDS: { id: Attend; label: string }[] = [
 export default function AdminAlta() {
   const router = useRouter();
   const { actions } = useApp();
-  const [world, setWorld] = useState<World | null>(null);
+  const [world, setWorld] = useState<World | null>(UN_SOLO_MUNDO ? MUNDO : null);
   const [cat, setCat] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [profession, setProfession] = useState('');
@@ -114,9 +115,9 @@ export default function AdminAlta() {
   return (
     <AdminShell title="Dar de alta un experto" subtitle="Tú lo registras; él lo reclama con su correo">
       <AdminCard style={{ gap: 12 }}>
-        <Text style={styles.step}>1. ¿Es profesionista u oficio?</Text>
+        {UN_SOLO_MUNDO ? null : <Text style={styles.step}>1. ¿Es profesionista u oficio?</Text>}
         <View style={styles.wrap}>
-          {(['profesionales', 'oficios'] as World[]).map((w) => (
+          {(UN_SOLO_MUNDO ? [] : (['profesionales', 'oficios'] as World[])).map((w) => (
             <Pressable
               key={w}
               accessibilityRole="radio"

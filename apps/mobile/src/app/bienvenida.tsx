@@ -12,7 +12,7 @@ import { Brand } from '@/constants/theme';
 import type { IconName } from '@/data/types';
 
 const SLIDES: { icon: IconName; art: EmojiName[]; title: string; text: string }[] = [
-  { icon: 'briefcase', art: ['abogada', 'mecanico', 'abaco', 'llave_inglesa'], title: 'Profesionales y oficios cerca de ti', text: 'Abogados, contadores, plomeros, electricistas y más. Todos verificados.' },
+  { icon: 'briefcase', art: ['abogada', 'profesional', 'abaco', 'balanza'], title: 'Profesionistas cerca de ti', text: 'Abogados, contadores, notarios, psicólogos y más. Con cédula verificada.' },
   { icon: 'calendar', art: ['calendario', 'telefono', 'billete', 'pin'], title: 'Agenda y paga fácil', text: 'Toca un botón para agendar, mandar mensaje o pedir precio. Paga como quieras.' },
   { icon: 'star', art: ['estrella', 'pulgar', 'palomita', 'personas'], title: 'Mira las estrellas', text: 'Las estrellas son de clientes reales. Así sabes en quién confiar.' },
 ];

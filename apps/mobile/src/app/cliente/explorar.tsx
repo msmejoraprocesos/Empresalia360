@@ -16,6 +16,7 @@ import { Brand, Radius, TabBarSpace } from '@/constants/theme';
 import { ATTEND_LABEL, CATEGORIES, inWorld, searchProfessionals, specialtiesFor, type SearchFilters } from '@/data';
 import type { Attend } from '@/data/types';
 import { useApp } from '@/store/app';
+import { UN_SOLO_MUNDO } from '@/constants/app-config';
 
 function Pill({ label, on, onPress, icon, emoji }: { label: string; on: boolean; onPress: () => void; icon?: 'checkmark'; emoji?: EmojiName }) {
   return (
@@ -87,7 +88,7 @@ export default function Explorar() {
             placeholder="Describe tu problema o escribe un nombre"
             placeholderTextColor={Brand.inkMuted}
             style={styles.searchInput}
-            accessibilityLabel="Buscar profesionales y oficios"
+            accessibilityLabel="Buscar profesionistas"
           />
           {q ? (
             <Pressable
@@ -111,7 +112,7 @@ export default function Explorar() {
         <View style={{ paddingHorizontal: 16 }}>
           <LookingForSwitch />
         </View>
-        {otherHits.length && !suggestions.length ? (
+        {!UN_SOLO_MUNDO && otherHits.length && !suggestions.length ? (
           <Pressable accessibilityRole="button" onPress={() => actions.setLookingFor(other)} style={[styles.otherWorld, { borderColor: WORLD[other].color }]}>
             <Emoji name={WORLD[other].emoji} size={36} />
             <View style={{ flex: 1 }}>
@@ -141,7 +142,7 @@ export default function Explorar() {
 
         {!searching ? (
           <View style={{ paddingHorizontal: 16, gap: 10 }}>
-            <Text style={styles.label}>Explora por profesión u oficio</Text>
+            <Text style={styles.label}>Explora por profesión</Text>
             <View style={styles.catWrap}>
               {CATEGORIES.filter((c) => c.group === lf).map((c) => (
                 <Pressable key={c.slug} accessibilityRole="button" onPress={() => router.push(`/categoria/${c.slug}`)} style={styles.cat}>

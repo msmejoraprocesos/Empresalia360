@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
+import { UN_SOLO_MUNDO } from '@/constants/app-config';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,6 +20,8 @@ export default function ElegirMundo() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { actions } = useApp();
+  // Expertalia es solo de profesionistas: esta pregunta no aplica
+  if (UN_SOLO_MUNDO) return <Redirect href="/cliente" />;
 
   const pick = (w: World) => {
     actions.setLookingFor(w);

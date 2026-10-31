@@ -1,5 +1,5 @@
 /**
- * Datos de ejemplo de Expertalia 360. Los profesionales y oficios son ficticios
+ * Datos de ejemplo de Expertalia 360. Los profesionistas son ficticios
  * y sirven para probar la app mientras no esté conectada a su propio Supabase.
  */
 import { Brand } from '../constants/brand';
@@ -77,58 +77,6 @@ export const CATEGORIES: Category[] = [
     ],
   },
   // ── Oficios ────────────────────────────────────────────────
-  {
-    slug: 'plomeria', name: 'Plomería', professional: 'Plomero', group: 'oficios', color: Brand.alberca, ink: Brand.white, icon: 'water-outline', emoji: 'destapador',
-    specialties: [
-      sp('Fugas de agua', 'fuga', 'gotea', 'humedad', 'goteo'),
-      sp('Calentadores', 'calentador', 'boiler', 'agua caliente'),
-      sp('Destapes y drenaje', 'destape', 'tapado', 'drenaje', 'coladera'),
-      sp('Tinacos y cisternas', 'tinaco', 'cisterna', 'bomba'),
-      sp('Instalación hidráulica', 'tubería', 'instalación', 'baño nuevo'),
-    ],
-  },
-  {
-    slug: 'electricidad', name: 'Electricidad', professional: 'Electricista', group: 'oficios', color: '#C98A0B', ink: Brand.white, icon: 'flash-outline', emoji: 'foco',
-    specialties: [
-      sp('Cortos y fallas', 'corto', 'se fue la luz', 'pastilla', 'apagón', 'falla eléctrica'),
-      sp('Instalaciones eléctricas', 'instalación eléctrica', 'cableado', 'contactos', 'apagadores'),
-      sp('Paneles solares', 'panel solar', 'solar', 'recibo cfe'),
-      sp('Cámaras y seguridad', 'cámaras', 'cctv', 'alarma', 'interfón'),
-    ],
-  },
-  {
-    slug: 'carpinteria', name: 'Carpintería', professional: 'Carpintero', group: 'oficios', color: '#8A5A2B', ink: Brand.white, icon: 'hammer-outline', emoji: 'serrucho',
-    specialties: [
-      sp('Muebles a medida', 'mueble', 'librero', 'mesa'),
-      sp('Closets y cocinas', 'closet', 'cocina integral', 'alacena'),
-      sp('Puertas y ventanas', 'puerta', 'ventana', 'marco'),
-      sp('Reparación de muebles', 'reparar', 'barniz', 'restaurar'),
-    ],
-  },
-  {
-    slug: 'climas', name: 'Climas y electrodomésticos', professional: 'Técnico', group: 'oficios', color: '#1B8FA6', ink: Brand.white, icon: 'snow-outline', emoji: 'copo',
-    specialties: [
-      sp('Minisplits', 'minisplit', 'aire acondicionado', 'clima'),
-      sp('Refrigeradores', 'refrigerador', 'refri', 'no enfría'),
-      sp('Lavadoras y secadoras', 'lavadora', 'secadora'),
-    ],
-  },
-  {
-    slug: 'pintura-y-albanileria', name: 'Pintura y albañilería', professional: 'Maestro de obra', group: 'oficios', color: Brand.nopalDark, ink: Brand.white, icon: 'color-fill-outline', emoji: 'brocha',
-    specialties: [
-      sp('Pintura', 'pintar', 'pintura', 'fachada'),
-      sp('Impermeabilización', 'impermeabilizar', 'goteras', 'techo'),
-      sp('Albañilería', 'barda', 'muro', 'piso', 'azulejo'),
-    ],
-  },
-  {
-    slug: 'cerrajeria', name: 'Cerrajería', professional: 'Cerrajero', group: 'oficios', color: Brand.inkSoft, ink: Brand.white, icon: 'key-outline', emoji: 'llave',
-    specialties: [
-      sp('Aperturas', 'me quedé afuera', 'abrir puerta', 'llaves adentro'),
-      sp('Cambio de chapas', 'chapa', 'cerradura', 'combinación'),
-      sp('Llaves de auto', 'llave de auto', 'control', 'duplicado'),
-    ],
-  },
 ];
 
 /** Dibujo de cada especialidad (lo ve quien no lee) */
@@ -602,211 +550,6 @@ export const BUSINESSES: Business[] = [
     reviews: [r('rv120', 'Ana G.', 5, 'Bajamos 15% los costos del taller en dos meses.', 'hace 1 mes', { paidWith: 'transferencia' })],
   },
   // ── Oficios ────────────────────────────────────────────────
-  {
-    id: 'b13',
-    slug: 'plomeria-hernandez',
-    name: 'Plomería Hernández',
-    categorySlug: 'plomeria',
-    profession: 'Plomero',
-    specialties: ['Fugas de agua', 'Calentadores', 'Destapes y drenaje', 'Tinacos y cisternas'],
-    yearsExp: 20,
-    license: 'Certificación CONOCER en instalaciones hidráulicas',
-    languages: ['Español'],
-    attends: ['domicilio'],
-    consultPrice: 250,
-    responseTime: 'Llega el mismo día',
-    subtitle: 'Plomero · servicio el mismo día',
-    description: 'Fugas, instalaciones, calentadores y destapes. La visita de diagnóstico se descuenta si hacemos el trabajo.',
-    address: 'Servicio a domicilio',
-    zone: 'Querétaro',
-    lat: 20.5998,
-    lng: -100.3272,
-    rating: 4.8,
-    ratingCount: 156,
-    isOpen: true,
-    closesAt: '20:00',
-    phone: '5214420000113',
-    modules: ['reservar', 'cotizar'],
-    delivers: true,
-    verified: true,
-    staff: ['Don Rafael', 'Iván'],
-    items: [
-      { id: 'i130', kind: 'cita', name: 'Visita de diagnóstico', price: 250, durationMin: 60, available: true },
-      { id: 'i131', kind: 'cotizacion', name: 'Reparar fuga', available: true },
-      { id: 'i132', kind: 'cotizacion', name: 'Instalar calentador', description: 'De paso o de depósito', available: true },
-    ],
-    reviews: [
-      r('rv130', 'Sofía N.', 5, 'Llegó en una hora, encontró la fuga y dejó todo limpio.', 'hace 2 semanas', { paidWith: 'efectivo' }),
-      r('rv131', 'Pedro S.', 5, 'Precio justo y explicó qué falló.', 'hace 1 mes', { paidWith: 'transferencia' }),
-    ],
-  },
-  {
-    id: 'b14',
-    slug: 'electrica-ramirez',
-    name: 'Eléctrica Ramírez',
-    categorySlug: 'electricidad',
-    profession: 'Electricista',
-    specialties: ['Cortos y fallas', 'Instalaciones eléctricas', 'Paneles solares'],
-    yearsExp: 16,
-    license: 'Técnico electricista certificado por CFE',
-    languages: ['Español'],
-    attends: ['domicilio'],
-    consultPrice: 300,
-    responseTime: 'Urgencias en 2 h',
-    subtitle: 'Electricista · urgencias y paneles solares',
-    description: 'Cortos, instalaciones nuevas, contactos y paneles solares con trámite ante CFE.',
-    address: 'Servicio a domicilio',
-    zone: 'Querétaro',
-    lat: 20.6045,
-    lng: -100.3298,
-    rating: 4.9,
-    ratingCount: 88,
-    isOpen: true,
-    closesAt: '21:00',
-    phone: '5214420000114',
-    modules: ['reservar', 'cotizar'],
-    delivers: true,
-    verified: true,
-    staff: ['Juan Ramírez'],
-    items: [
-      { id: 'i140', kind: 'cita', name: 'Visita por falla eléctrica', price: 300, durationMin: 60, available: true },
-      { id: 'i141', kind: 'cotizacion', name: 'Sistema de paneles solares', description: 'Incluye trámite CFE', available: true },
-    ],
-    reviews: [r('rv140', 'Laura M.', 5, 'Resolvió un corto que otros no encontraron.', 'hace 6 días', { paidWith: 'efectivo' })],
-  },
-  {
-    id: 'b15',
-    slug: 'carpinteria-don-chuy',
-    name: 'Carpintería Don Chuy',
-    categorySlug: 'carpinteria',
-    profession: 'Carpintero',
-    specialties: ['Muebles a medida', 'Closets y cocinas', 'Reparación de muebles'],
-    yearsExp: 30,
-    languages: ['Español'],
-    attends: ['domicilio', 'despacho'],
-    consultPrice: 0,
-    responseTime: 'Responde en menos de 1 día',
-    subtitle: 'Carpintero · cocinas y closets',
-    description: 'Cocinas integrales, closets y muebles a medida en madera y MDF. Medición sin costo.',
-    address: 'Calle Bambú 33 (taller)',
-    zone: 'El Marqués',
-    lat: 20.6066,
-    lng: -100.3289,
-    rating: 4.7,
-    ratingCount: 61,
-    isOpen: true,
-    closesAt: '18:00',
-    phone: '5214420000115',
-    modules: ['reservar', 'cotizar'],
-    delivers: true,
-    verified: false,
-    staff: ['Don Chuy'],
-    items: [
-      { id: 'i150', kind: 'cita', name: 'Medición a domicilio', price: 0, durationMin: 45, available: true },
-      { id: 'i151', kind: 'cotizacion', name: 'Cocina integral', available: true },
-      { id: 'i152', kind: 'cotizacion', name: 'Closet a medida', available: true },
-    ],
-    reviews: [r('rv150', 'Marta L.', 5, 'La cocina quedó idéntica al diseño y a tiempo.', 'hace 1 mes', { paidWith: 'transferencia' })],
-  },
-  {
-    id: 'b16',
-    slug: 'climas-del-bajio',
-    name: 'Climas del Bajío',
-    categorySlug: 'climas',
-    profession: 'Técnico en refrigeración',
-    specialties: ['Minisplits', 'Refrigeradores', 'Lavadoras y secadoras'],
-    yearsExp: 9,
-    license: 'Certificación en refrigeración y aire acondicionado',
-    languages: ['Español'],
-    attends: ['domicilio'],
-    consultPrice: 350,
-    responseTime: 'Responde en menos de 2 h',
-    subtitle: 'Técnico · minisplits y refrigeradores',
-    description: 'Instalación, mantenimiento y reparación de minisplits, refrigeradores y lavadoras de todas las marcas.',
-    address: 'Servicio a domicilio',
-    zone: 'Querétaro',
-    lat: 20.5975,
-    lng: -100.3268,
-    rating: 4.6,
-    ratingCount: 42,
-    isOpen: true,
-    closesAt: '19:00',
-    phone: '5214420000116',
-    modules: ['reservar', 'cotizar'],
-    delivers: true,
-    verified: true,
-    staff: ['Cualquiera'],
-    items: [
-      { id: 'i160', kind: 'cita', name: 'Mantenimiento de minisplit', price: 650, durationMin: 90, available: true },
-      { id: 'i161', kind: 'cita', name: 'Diagnóstico de refrigerador', price: 350, durationMin: 60, available: true },
-    ],
-    reviews: [r('rv160', 'Rodrigo M.', 4, 'Buen servicio, llegó media hora tarde pero avisó.', 'hace 2 semanas', { paidWith: 'efectivo' })],
-  },
-  {
-    id: 'b17',
-    slug: 'acabados-mendoza',
-    name: 'Acabados Mendoza',
-    categorySlug: 'pintura-y-albanileria',
-    profession: 'Maestro de obra',
-    specialties: ['Pintura', 'Impermeabilización', 'Albañilería'],
-    yearsExp: 22,
-    languages: ['Español'],
-    attends: ['domicilio'],
-    consultPrice: 0,
-    responseTime: 'Cotiza en 24 h',
-    subtitle: 'Pintura e impermeabilización',
-    description: 'Pintura interior y exterior, impermeabilización con garantía por escrito y trabajos de albañilería.',
-    address: 'Servicio a domicilio',
-    zone: 'Querétaro',
-    lat: 20.6028,
-    lng: -100.3225,
-    rating: 4.5,
-    ratingCount: 37,
-    isOpen: true,
-    closesAt: '18:00',
-    phone: '5214420000117',
-    modules: ['cotizar'],
-    delivers: true,
-    verified: false,
-    items: [
-      { id: 'i170', kind: 'cotizacion', name: 'Impermeabilización', description: 'Precio por m²', available: true },
-      { id: 'i171', kind: 'cotizacion', name: 'Pintura de casa', available: true },
-    ],
-    reviews: [r('rv170', 'Jorge V.', 5, 'Ya pasó la temporada de lluvias y cero goteras.', 'hace 2 meses', { paidWith: 'transferencia' })],
-  },
-  {
-    id: 'b18',
-    slug: 'cerrajeria-llave-maestra',
-    name: 'Cerrajería Llave Maestra',
-    categorySlug: 'cerrajeria',
-    profession: 'Cerrajero',
-    specialties: ['Aperturas', 'Cambio de chapas', 'Llaves de auto'],
-    yearsExp: 13,
-    languages: ['Español'],
-    attends: ['domicilio', 'despacho'],
-    consultPrice: 350,
-    responseTime: 'Llega en 40 min',
-    subtitle: 'Cerrajero · 24 horas',
-    description: 'Aperturas sin daño, cambio de chapas y duplicado de llaves de auto con chip. Servicio 24 horas.',
-    address: 'Av. 5 de Febrero 1500',
-    zone: 'Querétaro',
-    lat: 20.6052,
-    lng: -100.3338,
-    rating: 4.7,
-    ratingCount: 71,
-    isOpen: true,
-    closesAt: '24 h',
-    phone: '5214420000118',
-    modules: ['reservar', 'cotizar'],
-    delivers: true,
-    verified: true,
-    staff: ['Cualquiera'],
-    items: [
-      { id: 'i180', kind: 'cita', name: 'Apertura de puerta', price: 350, durationMin: 30, available: true },
-      { id: 'i181', kind: 'cotizacion', name: 'Llave de auto con chip', description: 'Dinos marca y modelo', available: true },
-    ],
-    reviews: [r('rv180', 'Lucía P.', 5, 'Llegó en media hora un domingo en la noche.', 'hace 1 semana', { paidWith: 'efectivo' })],
-  },
 ];
 
 /** Anuncios de servicios, consejos y eventos que publican los profesionales en la comunidad. */
@@ -815,11 +558,6 @@ export const POSTS: Post[] = [
     id: 'po1', businessSlug: 'despacho-contable-reyes', kind: 'servicio', specialty: 'Declaración anual',
     title: 'Declaración anual de personas físicas', body: 'Revisamos tus deducciones (médicos, colegiaturas, intereses) para que recuperes tu saldo a favor. Trae tu e.firma o te ayudamos a tramitarla.',
     price: 1200, priceNote: 'precio fijo', dateLabel: 'hace 2 h', likes: 34, comments: [{ author: 'Lucía P.', body: '¿Incluye si tengo dos patrones?' }, { author: 'Despacho Contable Reyes', body: 'Sí, Lucía, mismo precio.' }],
-  },
-  {
-    id: 'po2', businessSlug: 'plomeria-hernandez', kind: 'consejo', specialty: 'Fugas de agua',
-    title: '¿Tu recibo de agua subió sin razón?', body: 'Cierra todas las llaves y revisa el medidor 30 minutos. Si se mueve, tienes una fuga oculta. Te ayudo a encontrarla sin romper de más.',
-    dateLabel: 'hace 5 h', likes: 58, comments: [{ author: 'Pedro S.', body: 'Me pasó justo esto, gracias por el tip.' }],
   },
   {
     id: 'po3', businessSlug: 'lic-mariana-ortiz', kind: 'servicio', specialty: 'Familiar',
@@ -832,19 +570,9 @@ export const POSTS: Post[] = [
     dateLabel: 'ayer', likes: 47, comments: [{ author: 'Ana G.', body: 'Ya me registré 🙌' }],
   },
   {
-    id: 'po5', businessSlug: 'electrica-ramirez', kind: 'servicio', specialty: 'Paneles solares',
-    title: 'Paneles solares con trámite CFE incluido', body: 'Si tu recibo bimestral pasa de $2,000, un sistema de 6 paneles se paga en unos 3 años. Visita y cálculo sin costo este mes.',
-    priceNote: 'cotización sin costo', dateLabel: 'hace 2 días', likes: 39, comments: [],
-  },
-  {
     id: 'po6', businessSlug: 'lic-roberto-campos', kind: 'consejo', specialty: 'Laboral',
     title: 'Te despidieron: no firmes nada todavía', body: 'Tienes 2 meses para reclamar. Antes de firmar tu finiquito, revisa que incluya aguinaldo, vacaciones y prima vacacional proporcionales.',
     dateLabel: 'hace 3 días', likes: 112, comments: [{ author: 'Jorge V.', body: 'Este consejo me salvó.' }],
-  },
-  {
-    id: 'po7', businessSlug: 'acabados-mendoza', kind: 'servicio', specialty: 'Impermeabilización',
-    title: 'Impermeabiliza antes de las lluvias', body: 'Sistema acrílico de 5 años con garantía por escrito. Revisión de techo sin costo.',
-    price: 95, priceNote: 'por m²', dateLabel: 'hace 4 días', likes: 18, comments: [],
   },
   {
     id: 'po8', businessSlug: 'psic-andrea-vidal', kind: 'consejo', specialty: 'Ansiedad y estrés',
@@ -857,7 +585,6 @@ export const PROMOTIONS: Promotion[] = [
   { id: 'p1', kind: 'negocio', badge: '$350', title: 'Primera consulta en línea', subtitle: 'Lic. Mariana Ortiz · derecho familiar', businessSlug: 'lic-mariana-ortiz' },
   { id: 'p2', kind: 'global', badge: '−15%', title: 'Temporada de declaraciones', subtitle: 'Con contadores de Expertalia 360' },
   { id: 'p3', kind: 'vence', badge: 'Gratis', title: 'Revisión de pólizas', subtitle: 'Patricia Luna · vence el domingo', businessSlug: 'patricia-luna-seguros' },
-  { id: 'p4', kind: 'negocio', badge: '−20%', title: 'Mantenimiento de minisplit', subtitle: 'Climas del Bajío · antes del calor', businessSlug: 'climas-del-bajio' },
   { id: 'p5', kind: 'cumpleanos', badge: '−20%', title: 'Tu regalo de cumpleaños', subtitle: 'Psic. Andrea Vidal', businessSlug: 'psic-andrea-vidal' },
 ];
 
@@ -879,11 +606,6 @@ export const QUESTIONS: Question[] = [
     ],
   },
   {
-    id: 'qa3', author: 'Sofía N.', categorySlug: 'plomeria', specialty: 'Calentadores', dateLabel: 'hace 2 días',
-    body: 'Mi calentador de paso enciende y se apaga solo. ¿Es peligroso?',
-    answers: [{ businessSlug: 'plomeria-hernandez', body: 'Puede ser poca presión de agua o el sensor de flama sucio. No es peligroso si no huele a gas; si huele, cierra la llave y ventila. Es una reparación sencilla.', helpful: 15 }],
-  },
-  {
     id: 'qa4', author: 'Usuario 3381', categorySlug: 'arquitectura', dateLabel: 'hace 4 días',
     body: '¿Necesito licencia para construir un segundo piso en mi casa?', answers: [],
   },
@@ -901,16 +623,6 @@ export const INITIAL_ORDERS: Order[] = [
     total: 500,
     status: 'confirmada',
     createdAt: Date.now() - 5 * H,
-  },
-  {
-    id: 'o2',
-    type: 'cita',
-    businessSlug: 'plomeria-hernandez',
-    businessName: 'Plomería Hernández',
-    detail: 'Visita de diagnóstico · fuga en baño',
-    total: 250,
-    status: 'atendida',
-    createdAt: Date.now() - 3 * 24 * H,
   },
   {
     id: 'o3',
@@ -956,45 +668,6 @@ const EXTRA: Record<string, Partial<Business>> = {
     ],
     loyalty: { kind: 'sellos', goal: 12, reward: 'Un mes de contabilidad gratis' },
   },
-  'plomeria-hernandez': {
-    paymentInfo: 'Banorte · CLABE 072 680 0098 7654 3210 · a nombre de José Hernández Ruiz',
-    references: 'Atiende en todo Querétaro. Taller en Calle Bambú 12, junto a la tienda Don Beto.',
-    urgent24: true,
-    warranty: 'Garantía de 3 meses por escrito',
-    gallery: [
-      { id: 'g1', caption: 'Cambio de calentador de paso', color: '#DFEBFD' },
-      { id: 'g2', caption: 'Reparación de fuga en muro (antes y después)', color: '#E1E8F4' },
-      { id: 'g3', caption: 'Instalación de tinaco de 1,100 L', color: '#DCE4F2' },
-    ],
-    loyalty: { kind: 'sellos', goal: 4, reward: 'Cuarta visita sin costo de diagnóstico' },
-  },
-  'electrica-ramirez': {
-    urgent24: true,
-    warranty: 'Garantía de 6 meses en instalaciones',
-    gallery: [
-      { id: 'g1', caption: 'Sistema de 6 paneles solares', color: '#FBF0D9' },
-      { id: 'g2', caption: 'Tablero eléctrico nuevo', color: '#E2E7EF' },
-    ],
-  },
-  'cerrajeria-llave-maestra': {
-    urgent24: true,
-    references: 'Local con letrero amarillo, esquina con Av. Universidad.',
-    warranty: 'Garantía de 1 año en chapas',
-  },
-  'carpinteria-don-chuy': {
-    warranty: 'Garantía de 1 año en herrajes',
-    references: 'Taller con portón verde, a un lado de la papelería.',
-    gallery: [
-      { id: 'g1', caption: 'Cocina integral en roble', color: '#F1E4D6' },
-      { id: 'g2', caption: 'Closet de piso a techo', color: '#EADBC8' },
-      { id: 'g3', caption: 'Librero empotrado', color: '#F3E9DC' },
-    ],
-  },
-  'acabados-mendoza': {
-    warranty: 'Garantía de 5 años en impermeabilización',
-    gallery: [{ id: 'g1', caption: 'Azotea impermeabilizada, 120 m²', color: '#DDF1EA' }],
-  },
-  'climas-del-bajio': { warranty: 'Garantía de 3 meses en reparaciones' },
   'psic-andrea-vidal': {
     references: 'Consultorio 2, planta baja. Timbre con el nombre "Vidal".',
     gallery: [{ id: 'g1', caption: 'Consultorio', color: '#F8E1EB' }],
@@ -1026,21 +699,16 @@ const PACKAGES: Record<string, Business['items']> = {
   'lic-mariana-ortiz': [
     { id: 'pk8', kind: 'producto', section: 'Paquetes', name: 'Revisión de contrato de arrendamiento', description: 'Entrega por escrito en 48 h', price: 900, available: true },
   ],
-  'climas-del-bajio': [
-    { id: 'pk9', kind: 'producto', section: 'Paquetes', name: 'Mantenimiento de 2 minisplits', description: 'Limpieza profunda y revisión de gas', price: 1100, available: true },
-  ],
 };
 
 /**
  * Expertos que trabajan en varias categorías: aparecen en cada una (y en los dos mundos si aplica).
  * Siempre dentro de su mismo mundo: un despacho contable que también da consultoría,
- * o un maestro de obra que también hace carpintería. Un abogado nunca sale en oficios.
+ * o un despacho de abogados que también lleva contabilidad.
  */
 const MULTI: Record<string, { categories: string[]; specialties: string[] }> = {
   'despacho-contable-reyes': { categories: ['consultoria'], specialties: ['Finanzas para PyME'] },
   'ortiz-salinas-abogados': { categories: ['contadores'], specialties: ['Contabilidad de empresas'] },
-  'acabados-mendoza': { categories: ['carpinteria'], specialties: ['Puertas y ventanas'] },
-  'electrica-ramirez': { categories: ['climas'], specialties: ['Minisplits'] },
 };
 
 for (const b of BUSINESSES) {
@@ -1055,7 +723,7 @@ for (const b of BUSINESSES) {
 }
 
 // Ejemplo de perfil que dio de alta el administrador y aún no reclama su dueño
-for (const b of BUSINESSES) if (b.slug === 'cerrajeria-llave-maestra') b.claimable = true;
+for (const b of BUSINESSES) if (b.slug === 'traducciones-peritas-morales') b.claimable = true;
 
 export function categoryBySlug(slug: string): Category | undefined {
   return CATEGORIES.find((c) => c.slug === slug);

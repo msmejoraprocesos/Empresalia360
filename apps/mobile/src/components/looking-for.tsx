@@ -5,10 +5,13 @@ import { WORLD, type World } from '@/constants/world';
 import { useApp } from '@/store/app';
 
 import { Emoji } from './emoji';
+import { UN_SOLO_MUNDO } from '@/constants/app-config';
 
 /** Cambio de mundo: Profesionistas (con carrera) u Oficios. Nunca se muestran juntos. */
 export function LookingForSwitch({ dark }: { dark?: boolean }) {
   const { state, actions } = useApp();
+  // Expertalia es solo de profesionistas: no hay mundos que elegir
+  if (UN_SOLO_MUNDO) return null;
   return (
     <View style={[styles.wrap, dark && { backgroundColor: 'rgba(0,0,0,0.22)' }]} accessibilityRole="radiogroup" accessibilityLabel="¿Qué buscas?">
       {(['profesionales', 'oficios'] as World[]).map((w) => {

@@ -15,6 +15,7 @@ import { markSource } from '@/lib/analytics';
 import { distance } from '@/lib/format';
 import { WORLD } from '@/constants/world';
 import { useApp } from '@/store/app';
+import { UN_SOLO_MUNDO } from '@/constants/app-config';
 
 type Group = 'profesionales' | 'oficios';
 
@@ -62,12 +63,12 @@ export default function Mapa() {
           <RoundIconButton icon="chevron-back" label="Volver" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
           <Pressable style={[styles.search, Shadow]} onPress={() => router.push('/cliente/explorar')} accessibilityRole="button">
             <Ionicons name="search" size={18} color={Brand.inkSoft} />
-            <Text style={{ color: Brand.inkMuted, fontSize: 15 }}>Abogado, plomero, contador…</Text>
+            <Text style={{ color: Brand.inkMuted, fontSize: 15 }}>Abogado, contador, notario…</Text>
           </Pressable>
           <RoundIconButton icon={legend ? 'close' : 'color-palette-outline'} label="Colores del mapa" onPress={() => setLegend(!legend)} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 10 }}>
-          {(['profesionales', 'oficios'] as Group[]).map((g) => (
+          {(UN_SOLO_MUNDO ? [] : (['profesionales', 'oficios'] as Group[])).map((g) => (
             <Pressable
               key={g}
               accessibilityRole="button"

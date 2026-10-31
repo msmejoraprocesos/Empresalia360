@@ -9,10 +9,11 @@ import { BottomBar, Button, Header } from '@/components/ui';
 import { Brand, Radius, Shadow, ShadowStrong } from '@/constants/theme';
 import type { IconName, Role } from '@/data/types';
 import { useApp } from '@/store/app';
+import { UN_SOLO_MUNDO } from '@/constants/app-config';
 
 const ROLES: { id: Role; label: string; sub: string; icon: IconName; color: string; soft: string; ink: string }[] = [
   { id: 'vecino', label: 'Busco un experto', sub: 'Quiero encontrar a quien me ayude, ver reseñas y agendar', icon: 'person', color: Brand.chile, soft: Brand.chileSoft, ink: Brand.chileDark },
-  { id: 'negocio', label: 'Soy profesional u oficio', sub: 'Crear mi perfil con mis especialidades y recibir clientes', icon: 'briefcase', color: Brand.nopal, soft: Brand.nopalSoft, ink: Brand.nopalDark },
+  { id: 'negocio', label: 'Soy profesionista', sub: 'Crear mi perfil con mis especialidades y recibir clientes', icon: 'briefcase', color: Brand.nopal, soft: Brand.nopalSoft, ink: Brand.nopalDark },
 ];
 
 export default function ElegirPerfil() {
@@ -27,7 +28,7 @@ export default function ElegirPerfil() {
           <Text style={styles.title}>¿Cómo usarás Expertalia 360?</Text>
           <Text style={styles.sub}>Puedes cambiarlo después en tu perfil</Text>
           <View style={{ paddingHorizontal: 8, marginTop: 10 }}>
-            <SpeakButton dark text="¿Cómo usarás Expertalia? Toca Busco un experto si necesitas ayuda. Toca Soy profesional u oficio si ofreces tus servicios." />
+            <SpeakButton dark text="¿Cómo usarás Expertalia? Toca Busco un experto si necesitas ayuda. Toca Soy profesionista si ofreces tus servicios." />
           </View>
         </Header>
         <View style={{ padding: 20, marginTop: -40, gap: 12 }} accessibilityRole="radiogroup">
@@ -60,7 +61,7 @@ export default function ElegirPerfil() {
           label="Continuar"
           onPress={() => {
             actions.setRole(role);
-            router.replace(role === 'negocio' ? '/mi-negocio/perfil' : '/mundo');
+            router.replace(role === 'negocio' ? '/mi-negocio/perfil' : UN_SOLO_MUNDO ? '/cliente' : '/mundo');
           }}
         />
       </BottomBar>
