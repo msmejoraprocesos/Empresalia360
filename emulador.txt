@@ -1,0 +1,28 @@
+== dispositivo
+List of devices attached
+emulator-5554	device
+
+x86_64,arm64-v8a
+== apk
+-rw-r--r-- 1 runner runner 42961140 Oct 31 04:03 /home/runner/work/_temp/app-release.apk
+== instalar
+Performing Streamed Install
+Success
+== abrir
+  bash arg: -p
+  bash arg: mx.expertalia360.app
+  bash arg: -c
+  bash arg: android.intent.category.LAUNCHER
+  bash arg: 1
+args: [-p, mx.expertalia360.app, -c, android.intent.category.LAUNCHER, 1]
+ arg: "-p"
+ arg: "mx.expertalia360.app"
+ arg: "-c"
+ arg: "android.intent.category.LAUNCHER"
+ arg: "1"
+data="mx.expertalia360.app"
+data="android.intent.category.LAUNCHER"
+Events injected: 1
+## Network stats: elapsed time=765ms (0ms mobile, 0ms wifi, 765ms not connected)
+== proceso
+LA APP SE CERRÓ

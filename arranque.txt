@@ -1,0 +1,77 @@
++ SDK=/usr/local/lib/android/sdk
++ ls -la /dev/kvm
+crw-rw-rw- 1 root kvm 10, 232 Oct 31 04:04 /dev/kvm
++ SDKM=/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager
++ AVDM=/usr/local/lib/android/sdk/cmdline-tools/latest/bin/avdmanager
++ IMG='system-images;android-34;google_apis;x86_64'
++ yes
++ /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --install emulator platform-tools 'system-images;android-34;google_apis;x86_64'
+yes: standard output: Broken pipe
++ export ANDROID_AVD_HOME=/home/runner/.android/avd
++ ANDROID_AVD_HOME=/home/runner/.android/avd
++ mkdir -p /home/runner/.android/avd/prueba.avd
++ export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
++ ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
++ cat
++ cat
++ ls -la /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64/
++ head
+total 4364352
+drwxr-xr-x 3 runner runner       4096 Oct 31 04:05 .
+drwxr-xr-x 3 runner runner       4096 Oct 31 04:05 ..
+-rw-r--r-- 1 runner runner   19603789 Oct 31 04:04 NOTICE.txt
+-rw-r--r-- 1 runner runner        356 Oct 31 04:04 VerifiedBootParams.textproto
+-rw-r--r-- 1 runner runner        689 Oct 31 04:04 advancedFeatures.ini
+-rw-r--r-- 1 runner runner       5008 Oct 31 04:04 build.prop
+drwxr-xr-x 3 runner runner       4096 Oct 31 04:05 data
+-rw-r--r-- 1 runner runner   18874368 Oct 31 04:04 encryptionkey.img
+-rw-r--r-- 1 runner runner   17374688 Oct 31 04:04 kernel-ranchu
++ export PATH=/usr/local/lib/android/sdk/platform-tools:/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64/bin:/opt/hostedtoolcache/node/22.23.4/x64/bin:/snap/bin:/home/runner/.local/bin:/opt/pipx_bin:/home/runner/.cargo/bin:/home/runner/.config/composer/vendor/bin:/usr/local/.ghcup/bin:/home/runner/.dotnet/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
++ /usr/local/lib/android/sdk/emulator/emulator -avd prueba -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
++ PATH=/usr/local/lib/android/sdk/platform-tools:/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64/bin:/opt/hostedtoolcache/node/22.23.4/x64/bin:/snap/bin:/home/runner/.local/bin:/opt/pipx_bin:/home/runner/.cargo/bin:/home/runner/.config/composer/vendor/bin:/usr/local/.ghcup/bin:/home/runner/.dotnet/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
++ timeout 600 adb wait-for-device
+* daemon not running; starting now at tcp:5037
+* daemon started successfully
+++ seq 1 120
++ for i in $(seq 1 120)
+++ adb shell getprop sys.boot_completed
+++ tr -d '\r'
++ '[' '' = 1 ']'
++ sleep 5
++ for i in $(seq 1 120)
+++ adb shell getprop sys.boot_completed
+++ tr -d '\r'
++ '[' '' = 1 ']'
++ sleep 5
++ for i in $(seq 1 120)
+++ adb shell getprop sys.boot_completed
+++ tr -d '\r'
++ '[' '' = 1 ']'
++ sleep 5
++ for i in $(seq 1 120)
+++ tr -d '\r'
+++ adb shell getprop sys.boot_completed
++ '[' '' = 1 ']'
++ sleep 5
++ for i in $(seq 1 120)
+++ adb shell getprop sys.boot_completed
+++ tr -d '\r'
++ '[' '' = 1 ']'
++ sleep 5
++ for i in $(seq 1 120)
+++ adb shell getprop sys.boot_completed
+++ tr -d '\r'
++ '[' '' = 1 ']'
++ sleep 5
++ for i in $(seq 1 120)
+++ adb shell getprop sys.boot_completed
+++ tr -d '\r'
++ '[' 1 = 1 ']'
++ break
++ adb shell getprop sys.boot_completed
+1
++ adb shell settings put global window_animation_scale 0
++ adb shell settings put global transition_animation_scale 0
++ adb shell settings put global animator_duration_scale 0
++ bash /home/runner/work/Empresalia360/Empresalia360/.github/scripts/diag-emulador.sh
++ exit 0
